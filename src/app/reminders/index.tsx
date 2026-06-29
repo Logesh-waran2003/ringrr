@@ -9,29 +9,27 @@ import { useRouter, useFocusEffect } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { TouchableOpacity } from 'react-native-gesture-handler'
-import Animated, { FadeIn } from 'react-native-reanimated'
+import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated'
 import { useReminders } from '@/hooks/useReminders'
 import { ReminderCard } from '@/components/ReminderCard'
 import { EmptyState } from '@/components/EmptyState'
 import { FAB } from '@/components/FAB'
-import { UpcomingPanel } from '@/components/UpcomingPanel'
-import { colors, spacing, typography } from '@/constants/theme'
+import { colors, spacing, typography, radius } from '@/constants/theme'
 import { getGreeting } from '@/utils/date'
 import type { Reminder } from '@/types/reminder'
 
-type Group = { title: string; data: Reminder[] }
+type Group = { title: string; data: Reminder[]; accent?: string }
 
 export default function RemindersScreen() {
   const router = useRouter()
   const {
-    reminders,
     loading,
     overdue,
     todayItems,
     tomorrowItems,
     laterItems,
-    upcoming24h,
     pending,
+    upcoming24h,
     markComplete,
     markDismissed,
     deleteReminder,
@@ -44,12 +42,20 @@ export default function RemindersScreen() {
     }, [refresh])
   )
 
+  // Next reminder within 2 hours for the inline pill
+  const upNextReminder = useMemo(() => {
+    const cutoff = Date.now() + 2 * 60 * 60 * 1000
+    return upcoming24h.find(
+      (r) => new Date(r.scheduledAt).getTime() <= cutoff
+    ) ?? null
+  }, [upcoming24h])
+
   const groups = useMemo<Group[]>(() => {
     const g: Group[] = []
-    if (overdue.length) g.push({ title: 'OVERDUE', data: overdue })
-    if (todayItems.length) g.push({ title: 'TODAY', data: todayItems })
-    if (tomorrowItems.length) g.push({ title: 'TOMORROW', data: tomorrowItems })
-    if (laterItems.length) g.push({ title: 'UPCOMING', data: laterItems })
+    if (overdue.length)    g.push({ title: 'Overdue',  data: overdue,      accent: colors.negative })
+    if (todayItems.length) g.push({ title: 'Today',    data: todayItems,   accent: colors.primary })
+    if (tomorrowItems.length) g.push({ title: 'Tomorrow', data: tomorrowItems })
+    if (laterItems.length) g.push({ title: 'Upcoming', data: laterItems })
     return g
   }, [overdue, todayItems, tomorrowItems, laterItems])
 
@@ -63,26 +69,31 @@ export default function RemindersScreen() {
     <SafeAreaView style={styles.container} edges={['top']}>
       {/* Header */}
       <Animated.View entering={FadeIn.duration(400)} style={styles.header}>
-        <View>
-          <Text style={typography.h1}>{getGreeting()}</Text>
-          <Text style={styles.subheading}>
-            {pending.length === 0
-              ? 'Nothing pending'
-              : `${pending.length} reminder${pending.length === 1 ? '' : 's'} pending`}
-          </Text>
+        <View style={styles.headerLeft}>
+          <Text style={styles.greeting}>{getGreeting()}</Text>
+          <View style={styles.subtitleRow}>
+            <Text style={styles.subheading}>
+              {pending.length === 0
+                ? 'Nothing pending'
+                : `${pending.length} reminder${pending.length === 1 ? '' : 's'} pending`}
+            </Text>
+            {upNextReminder && (
+              <View style={styles.upNextPill}>
+                <Ionicons name="time-outline" size={11} color={colors.primary} />
+                <Text style={styles.upNextText} numberOfLines={1}>
+                  {upNextReminder.title}
+                </Text>
+              </View>
+            )}
+          </View>
         </View>
         <TouchableOpacity
           onPress={() => router.push('/history')}
           style={styles.historyBtn}
         >
-          <Ionicons name="time-outline" size={22} color={colors.textSecondary} />
+          <Ionicons name="time-outline" size={20} color={colors.textSecondary} />
         </TouchableOpacity>
       </Animated.View>
-
-      {/* Upcoming 24h panel */}
-      {upcoming24h.length > 0 && (
-        <UpcomingPanel reminders={upcoming24h} />
-      )}
 
       {/* Main list */}
       <ScrollView
@@ -93,9 +104,25 @@ export default function RemindersScreen() {
         {groups.length === 0 ? (
           <EmptyState />
         ) : (
-          groups.map((group) => (
-            <View key={group.title} style={styles.group}>
-              <Text style={styles.groupHeader}>{group.title}</Text>
+          groups.map((group, gi) => (
+            <Animated.View
+              key={group.title}
+              entering={FadeInDown.delay(gi * 60).springify()}
+              style={styles.group}
+            >
+              <View style={styles.groupHeaderRow}>
+                {group.accent && (
+                  <View style={[styles.groupAccentBar, { backgroundColor: group.accent }]} />
+                )}
+                <Text style={[
+                  styles.groupHeader,
+                  group.accent ? { color: group.accent } : null,
+                ]}>
+                  {group.title}
+                </Text>
+                <Text style={styles.groupCount}>{group.data.length}</Text>
+              </View>
+
               {group.data.map((reminder, index) => (
                 <ReminderCard
                   key={reminder.id}
@@ -106,7 +133,7 @@ export default function RemindersScreen() {
                   onEdit={handleEdit}
                 />
               ))}
-            </View>
+            </Animated.View>
           ))
         )}
       </ScrollView>
@@ -120,22 +147,52 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg },
   header: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     justifyContent: 'space-between',
     paddingHorizontal: spacing.lg,
     paddingTop: spacing.md,
-    paddingBottom: spacing.sm,
+    paddingBottom: spacing.md,
   },
-  subheading: { ...typography.body, color: colors.textSecondary, marginTop: 2 },
+  headerLeft: { flex: 1, gap: 4 },
+  greeting: {
+    ...typography.h1,
+  },
+  subtitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    flexWrap: 'wrap',
+  },
+  subheading: {
+    ...typography.body,
+    color: colors.textSecondary,
+    fontSize: 14,
+  },
+  upNextPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    backgroundColor: colors.primarySubtle,
+    borderRadius: radius.full,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    maxWidth: 160,
+  },
+  upNextText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: colors.primary,
+  },
   historyBtn: {
-    width: 40,
-    height: 40,
+    width: 38,
+    height: 38,
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: colors.surface,
-    borderRadius: 20,
+    borderRadius: radius.full,
     borderWidth: 1,
     borderColor: colors.border,
+    marginTop: 4,
   },
   scroll: { flex: 1 },
   scrollContent: {
@@ -143,11 +200,28 @@ const styles = StyleSheet.create({
     paddingBottom: 120,
     flexGrow: 1,
   },
-  group: { marginBottom: spacing.lg },
-  groupHeader: {
-    ...typography.label,
+  group: { marginBottom: spacing.xl },
+  groupHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
     marginBottom: spacing.sm,
-    paddingLeft: 2,
+  },
+  groupAccentBar: {
+    width: 3,
+    height: 14,
+    borderRadius: 2,
+  },
+  groupHeader: {
+    fontSize: 13,
+    fontWeight: '600',
     color: colors.textMuted,
+    letterSpacing: 0.2,
+    flex: 1,
+  },
+  groupCount: {
+    fontSize: 12,
+    color: colors.textMuted,
+    fontWeight: '500',
   },
 })

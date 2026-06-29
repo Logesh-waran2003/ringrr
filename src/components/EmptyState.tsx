@@ -1,34 +1,14 @@
-import React, { useEffect } from 'react'
+import React from 'react'
 import { StyleSheet, Text, View } from 'react-native'
-import Animated, { FadeIn, useAnimatedStyle, useSharedValue, withRepeat, withSequence, withTiming } from 'react-native-reanimated'
-import { Ionicons } from '@expo/vector-icons'
+import Animated, { FadeIn } from 'react-native-reanimated'
 import { colors, spacing, typography } from '@/constants/theme'
 
 export function EmptyState() {
-  const translateY = useSharedValue(0)
-
-  useEffect(() => {
-    translateY.value = withRepeat(
-      withSequence(
-        withTiming(-8, { duration: 1500 }),
-        withTiming(0, { duration: 1500 })
-      ),
-      -1,
-      false
-    )
-  }, [])
-
-  const floatStyle = useAnimatedStyle(() => ({
-    transform: [{ translateY: translateY.value }],
-  }))
-
   return (
-    <Animated.View entering={FadeIn.delay(200)} style={styles.container}>
-      <Animated.View style={[styles.iconWrap, floatStyle]}>
-        <Ionicons name="alarm-outline" size={64} color={colors.primary} />
-      </Animated.View>
-      <Text style={styles.title}>No reminders yet</Text>
-      <Text style={styles.subtitle}>Tap + to add your first reminder</Text>
+    <Animated.View entering={FadeIn.delay(150)} style={styles.container}>
+      <Text style={styles.dash}>—</Text>
+      <Text style={styles.title}>Nothing scheduled</Text>
+      <Text style={styles.subtitle}>Tap + to add a reminder</Text>
     </Animated.View>
   )
 }
@@ -39,22 +19,21 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     paddingBottom: 80,
-    gap: spacing.sm,
+    gap: spacing.xs,
   },
-  iconWrap: {
-    width: 100,
-    height: 100,
-    backgroundColor: colors.primarySubtle,
-    borderRadius: 50,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: spacing.md,
+  dash: {
+    fontSize: 32,
+    color: colors.textMuted,
+    marginBottom: spacing.sm,
+    fontWeight: '300',
   },
   title: {
-    ...typography.h2,
+    ...typography.h3,
+    color: colors.textSecondary,
+    fontWeight: '500',
   },
   subtitle: {
-    ...typography.body,
-    color: colors.textSecondary,
+    ...typography.caption,
+    color: colors.textMuted,
   },
 })

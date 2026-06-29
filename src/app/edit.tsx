@@ -27,14 +27,14 @@ const CATEGORY_COLORS: Record<Category, string> = {
 }
 const SOUNDS: { name: BuiltinSound; label: string }[] = [
   { name: 'default', label: 'Default' },
-  { name: 'chime', label: 'Chime' },
-  { name: 'bell', label: 'Bell' },
+  { name: 'chime',   label: 'Chime' },
+  { name: 'bell',    label: 'Bell' },
   { name: 'digital', label: 'Digital' },
-  { name: 'gentle', label: 'Gentle' },
+  { name: 'gentle',  label: 'Gentle' },
 ]
 
 function formatDate(d: Date) {
-  return d.toLocaleDateString('en-US', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' })
+  return d.toLocaleDateString('en-US', { weekday: 'short', day: 'numeric', month: 'short' })
 }
 function formatTime(d: Date) {
   return d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })
@@ -80,8 +80,7 @@ export default function EditScreen() {
 
   useEffect(() => {
     if (!date) return
-    const found = detectConflicts(date.toISOString(), reminders, id)
-    setConflicts(found)
+    setConflicts(detectConflicts(date.toISOString(), reminders, id))
   }, [date, reminders, id])
 
   useEffect(() => {
@@ -150,7 +149,7 @@ export default function EditScreen() {
   }, [conflicts, doSave])
 
   const handleDelete = () => {
-    Alert.alert('Delete Reminder', `Delete "${reminder?.title}"? This cannot be undone.`, [
+    Alert.alert('Delete Reminder', `Delete "${reminder?.title}"?`, [
       { text: 'Cancel', style: 'cancel' },
       {
         text: 'Delete', style: 'destructive',
@@ -170,18 +169,18 @@ export default function EditScreen() {
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
         <View style={styles.header}>
           <TouchableOpacity onPress={() => router.back()} style={styles.closeBtn}>
-            <Ionicons name="close" size={22} color={colors.textSecondary} />
+            <Ionicons name="close" size={20} color={colors.textSecondary} />
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>Edit Reminder</Text>
+          <Text style={styles.headerTitle}>Edit reminder</Text>
           <TouchableOpacity onPress={handleDelete} style={styles.deleteBtn}>
-            <Ionicons name="trash-outline" size={18} color={colors.negative} />
+            <Ionicons name="trash-outline" size={17} color={colors.negative} />
           </TouchableOpacity>
         </View>
 
         <ScrollView style={styles.scroll} contentContainerStyle={styles.form} keyboardShouldPersistTaps="handled">
           {conflicts.length > 0 && (
             <Animated.View entering={FadeInDown.duration(200)} style={styles.conflictBanner}>
-              <Ionicons name="warning-outline" size={16} color={colors.negative} />
+              <Ionicons name="warning-outline" size={15} color={colors.negative} />
               <Text style={styles.conflictText}>
                 Conflicts with {conflicts.map((c) => `"${c.title}" (${formatTime(new Date(c.scheduledAt))})`).join(', ')}
               </Text>
@@ -202,38 +201,47 @@ export default function EditScreen() {
           </Animated.View>
 
           <Animated.View entering={FadeInDown.delay(120).springify()}>
-            <Text style={styles.fieldLabel}>DATE</Text>
-            <TouchableOpacity style={styles.pickerBtn} onPress={() => setShowDatePicker(true)}>
-              <Ionicons name="calendar-outline" size={18} color={colors.primary} />
-              <Text style={styles.pickerBtnText}>{formatDate(date)}</Text>
-            </TouchableOpacity>
+            <Text style={styles.fieldLabel}>When</Text>
+            <View style={styles.dateTimeRow}>
+              <TouchableOpacity
+                style={[styles.pickerBtn, { flex: 1 }]}
+                onPress={() => setShowDatePicker(true)}
+              >
+                <Ionicons name="calendar-outline" size={16} color={colors.primary} />
+                <Text style={styles.pickerBtnText}>{formatDate(date)}</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.pickerBtn, styles.timeBtn]}
+                onPress={() => setShowTimePicker(true)}
+              >
+                <Ionicons name="time-outline" size={16} color={colors.primary} />
+                <Text style={styles.pickerBtnText}>{formatTime(date)}</Text>
+              </TouchableOpacity>
+            </View>
           </Animated.View>
 
           <Animated.View entering={FadeInDown.delay(180).springify()}>
-            <Text style={styles.fieldLabel}>TIME</Text>
-            <TouchableOpacity style={styles.pickerBtn} onPress={() => setShowTimePicker(true)}>
-              <Ionicons name="time-outline" size={18} color={colors.primary} />
-              <Text style={styles.pickerBtnText}>{formatTime(date)}</Text>
-            </TouchableOpacity>
-          </Animated.View>
-
-          <Animated.View entering={FadeInDown.delay(240).springify()}>
-            <Text style={styles.fieldLabel}>CATEGORY</Text>
+            <Text style={styles.fieldLabel}>Category</Text>
             <View style={styles.categoryRow}>
               {CATEGORIES.map((cat) => (
                 <TouchableOpacity
                   key={cat}
-                  style={[styles.categoryPill, category === cat && { backgroundColor: CATEGORY_COLORS[cat] + '25', borderColor: CATEGORY_COLORS[cat] }]}
+                  style={[
+                    styles.categoryPill,
+                    category === cat && { backgroundColor: CATEGORY_COLORS[cat] + '20', borderColor: CATEGORY_COLORS[cat] },
+                  ]}
                   onPress={() => { setCategory(cat); Haptics.selectionAsync() }}
                 >
-                  <Text style={[styles.categoryPillText, category === cat && { color: CATEGORY_COLORS[cat] }]}>{cat}</Text>
+                  <Text style={[styles.categoryPillText, category === cat && { color: CATEGORY_COLORS[cat] }]}>
+                    {cat}
+                  </Text>
                 </TouchableOpacity>
               ))}
             </View>
           </Animated.View>
 
-          <Animated.View entering={FadeInDown.delay(300).springify()}>
-            <Text style={styles.fieldLabel}>SOUND</Text>
+          <Animated.View entering={FadeInDown.delay(240).springify()}>
+            <Text style={styles.fieldLabel}>Sound</Text>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.soundRow}>
               {SOUNDS.map((s) => (
                 <TouchableOpacity
@@ -241,15 +249,17 @@ export default function EditScreen() {
                   style={[styles.soundPill, sound === s.name && styles.soundPillActive]}
                   onPress={() => { setSound(s.name); Haptics.selectionAsync() }}
                 >
-                  <Ionicons name="musical-note-outline" size={13} color={sound === s.name ? '#000' : colors.textSecondary} />
+                  <Ionicons name="musical-note-outline" size={12} color={sound === s.name ? '#000' : colors.textSecondary} />
                   <Text style={[styles.soundPillText, sound === s.name && styles.soundPillTextActive]}>{s.label}</Text>
                 </TouchableOpacity>
               ))}
             </ScrollView>
           </Animated.View>
 
-          <Animated.View entering={FadeInDown.delay(360).springify()}>
-            <Text style={styles.fieldLabel}>NOTE (OPTIONAL)</Text>
+          <Animated.View entering={FadeInDown.delay(300).springify()}>
+            <Text style={styles.fieldLabel}>
+              Note <Text style={styles.optionalLabel}>(optional)</Text>
+            </Text>
             <TextInput
               style={styles.noteInput}
               placeholder="Add a note..."
@@ -264,9 +274,13 @@ export default function EditScreen() {
           </Animated.View>
         </ScrollView>
 
-        <Animated.View entering={FadeInDown.delay(420).springify()} style={styles.saveWrap}>
-          <TouchableOpacity style={[styles.saveBtn, saving && styles.saveBtnDisabled]} onPress={handleSave} disabled={saving}>
-            <Text style={styles.saveBtnText}>{saving ? 'Saving...' : 'Update Reminder'}</Text>
+        <Animated.View entering={FadeInDown.delay(360).springify()} style={styles.saveWrap}>
+          <TouchableOpacity
+            style={[styles.saveBtn, saving && styles.saveBtnDisabled]}
+            onPress={handleSave}
+            disabled={saving}
+          >
+            <Text style={styles.saveBtnText}>{saving ? 'Saving...' : 'Update reminder'}</Text>
           </TouchableOpacity>
         </Animated.View>
       </KeyboardAvoidingView>
@@ -283,31 +297,69 @@ export default function EditScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg },
-  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: spacing.lg, paddingVertical: spacing.md, borderBottomWidth: 1, borderBottomColor: colors.border },
-  closeBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: colors.surface, alignItems: 'center', justifyContent: 'center' },
-  deleteBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: colors.negative + '18', alignItems: 'center', justifyContent: 'center' },
-  headerTitle: typography.h3,
+  header: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    paddingHorizontal: spacing.lg, paddingVertical: spacing.md,
+    borderBottomWidth: 1, borderBottomColor: colors.border,
+  },
+  closeBtn: {
+    width: 36, height: 36, borderRadius: radius.full,
+    backgroundColor: colors.surface, alignItems: 'center', justifyContent: 'center',
+  },
+  deleteBtn: {
+    width: 36, height: 36, borderRadius: radius.full,
+    backgroundColor: colors.negative + '15', alignItems: 'center', justifyContent: 'center',
+  },
+  headerTitle: { ...typography.h3, fontWeight: '500', color: colors.textSecondary },
   scroll: { flex: 1 },
   form: { padding: spacing.lg, gap: spacing.lg, paddingBottom: spacing.xxl },
-  conflictBanner: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.xs, backgroundColor: colors.negative + '18', borderWidth: 1, borderColor: colors.negative + '40', borderRadius: radius.md, padding: spacing.md },
+  conflictBanner: {
+    flexDirection: 'row', alignItems: 'flex-start', gap: spacing.xs,
+    backgroundColor: colors.negative + '15', borderWidth: 1,
+    borderColor: colors.negative + '35', borderRadius: radius.md, padding: spacing.md,
+  },
   conflictText: { ...typography.caption, color: colors.negative, flex: 1 },
-  titleInput: { backgroundColor: colors.surfaceElevated, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, padding: spacing.md, ...typography.h2, fontSize: 20, color: colors.textPrimary },
+  titleInput: {
+    backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border,
+    borderRadius: radius.md, padding: spacing.md,
+    ...typography.h2, fontSize: 20, color: colors.textPrimary,
+  },
   inputError: { borderColor: colors.negative },
   errorText: { ...typography.caption, color: colors.negative, marginTop: 4 },
-  fieldLabel: { ...typography.label, color: colors.textMuted, marginBottom: spacing.sm },
-  pickerBtn: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, backgroundColor: colors.surfaceElevated, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, padding: spacing.md },
-  pickerBtnText: { ...typography.body, color: colors.textPrimary },
+  fieldLabel: { fontSize: 13, fontWeight: '500', color: colors.textSecondary, marginBottom: spacing.sm },
+  optionalLabel: { fontSize: 12, fontWeight: '400', color: colors.textMuted },
+  dateTimeRow: { flexDirection: 'row', gap: spacing.sm },
+  pickerBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: spacing.xs,
+    backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border,
+    borderRadius: radius.md, paddingHorizontal: spacing.md, paddingVertical: spacing.sm + 2,
+  },
+  timeBtn: { flexShrink: 0 },
+  pickerBtnText: { fontSize: 14, color: colors.textPrimary, fontWeight: '500' },
   categoryRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
-  categoryPill: { paddingHorizontal: spacing.md, paddingVertical: spacing.sm, borderRadius: radius.full, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface },
-  categoryPillText: { ...typography.caption, color: colors.textSecondary, fontWeight: '600' },
+  categoryPill: {
+    paddingHorizontal: spacing.md, paddingVertical: spacing.xs + 2,
+    borderRadius: radius.full, borderWidth: 1,
+    borderColor: colors.border, backgroundColor: colors.surface,
+  },
+  categoryPillText: { fontSize: 13, fontWeight: '500', color: colors.textSecondary },
   soundRow: { gap: spacing.sm, paddingRight: spacing.sm },
-  soundPill: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, borderRadius: radius.full, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface },
+  soundPill: {
+    flexDirection: 'row', alignItems: 'center', gap: 4,
+    paddingHorizontal: spacing.md, paddingVertical: spacing.xs + 2,
+    borderRadius: radius.full, borderWidth: 1,
+    borderColor: colors.border, backgroundColor: colors.surface,
+  },
   soundPillActive: { backgroundColor: colors.primary, borderColor: colors.primary },
-  soundPillText: { ...typography.caption, color: colors.textSecondary, fontWeight: '600' },
+  soundPillText: { fontSize: 13, fontWeight: '500', color: colors.textSecondary },
   soundPillTextActive: { color: '#000' },
-  noteInput: { backgroundColor: colors.surfaceElevated, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, padding: spacing.md, ...typography.body, color: colors.textPrimary, minHeight: 90 },
+  noteInput: {
+    backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border,
+    borderRadius: radius.md, padding: spacing.md,
+    ...typography.body, color: colors.textPrimary, minHeight: 88,
+  },
   saveWrap: { padding: spacing.lg, paddingTop: 0 },
-  saveBtn: { backgroundColor: colors.primary, borderRadius: radius.lg, padding: spacing.md + 2, alignItems: 'center' },
-  saveBtnDisabled: { opacity: 0.6 },
-  saveBtnText: { ...typography.h3, color: '#000', fontWeight: '700' },
+  saveBtn: { backgroundColor: colors.primary, borderRadius: radius.lg, paddingVertical: spacing.md + 2, alignItems: 'center' },
+  saveBtnDisabled: { opacity: 0.5 },
+  saveBtnText: { fontSize: 16, fontWeight: '700', color: '#000' },
 })

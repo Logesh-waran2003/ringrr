@@ -1,4 +1,4 @@
-import React, { useCallback, useRef } from 'react'
+import React, { useCallback } from 'react'
 import {
   Alert,
   StyleSheet,
@@ -15,7 +15,6 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated'
 import { Gesture, GestureDetector } from 'react-native-gesture-handler'
-
 import * as Haptics from 'expo-haptics'
 import { Ionicons } from '@expo/vector-icons'
 import { colors, radius, spacing, typography } from '@/constants/theme'
@@ -24,9 +23,9 @@ import { formatReminderDateTime } from '@/utils/date'
 
 const CATEGORY_COLORS: Record<Category, string> = {
   Personal: '#8B5CF6',
-  Work: '#3B82F6',
-  Health: '#10B981',
-  Social: '#F59E0B',
+  Work:     '#3B82F6',
+  Health:   '#10B981',
+  Social:   '#F59E0B',
 }
 
 const SWIPE_THRESHOLD = -80
@@ -47,12 +46,15 @@ export function ReminderCard({
   onEdit,
 }: ReminderCardProps) {
   const translateX = useSharedValue(0)
-  const opacity = useSharedValue(1)
+  const opacity    = useSharedValue(1)
+
   const isCompleted = reminder.status === 'completed'
   const isDismissed = reminder.status === 'dismissed'
-  const isOverdue: boolean =
-    reminder.status === 'pending' &&
+  const isDone      = isCompleted || isDismissed
+  const isOverdue   = reminder.status === 'pending' &&
     new Date(reminder.scheduledAt).getTime() <= Date.now()
+
+  const accentColor = CATEGORY_COLORS[reminder.category]
 
   const confirmDelete = useCallback(() => {
     Alert.alert('Delete Reminder', `Delete "${reminder.title}"?`, [
@@ -98,13 +100,13 @@ export function ReminderCard({
       translateX.value = withSpring(0)
       return
     }
-    if (isCompleted || isDismissed) return
+    if (isDone) return
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)
     onEdit(reminder.id)
   }
 
   const handleComplete = () => {
-    if (isCompleted || isDismissed) return
+    if (isDone) return
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success)
     Alert.alert('Complete Reminder', `Mark "${reminder.title}" as done?`, [
       { text: 'Cancel', style: 'cancel' },
@@ -117,7 +119,7 @@ export function ReminderCard({
       entering={FadeInDown.delay(index * 60).springify()}
       style={styles.wrapper}
     >
-      {/* Delete action revealed on swipe */}
+      {/* Swipe-to-delete background */}
       <Animated.View style={[styles.deleteAction, deleteRevealStyle]}>
         <TouchableOpacity onPress={confirmDelete} style={styles.deleteBtn}>
           <Ionicons name="trash-outline" size={20} color={colors.textPrimary} />
@@ -125,69 +127,65 @@ export function ReminderCard({
       </Animated.View>
 
       <GestureDetector gesture={pan}>
-        <Animated.View style={[styles.card, cardStyle]}>
+        <Animated.View style={[styles.card, isOverdue && styles.cardOverdue, cardStyle]}>
+          {/* Left accent bar */}
+          <View style={[styles.accentBar, { backgroundColor: isOverdue ? colors.negative : accentColor }]} />
+
           <TouchableOpacity
             activeOpacity={0.75}
             onPress={handleTap}
             style={styles.cardInner}
           >
-            {/* Category dot */}
-            <View
-              style={[
-                styles.categoryDot,
-                { backgroundColor: CATEGORY_COLORS[reminder.category] },
-              ]}
-            />
-
             {/* Content */}
             <View style={styles.content}>
               <Text
                 style={[
                   styles.title,
-                  isOverdue && { color: colors.negative },
-                  (isCompleted || isDismissed) && styles.titleDone,
+                  isDone && styles.titleDone,
                 ]}
                 numberOfLines={2}
               >
                 {reminder.title}
               </Text>
+
               {reminder.description ? (
                 <Text style={styles.description} numberOfLines={1}>
                   {reminder.description}
                 </Text>
               ) : null}
-              <Text style={styles.time}>
-                {formatReminderDateTime(reminder.scheduledAt)}
-                {isOverdue && (
-                  <Text style={{ color: colors.negative }}> · Overdue</Text>
-                )}
-              </Text>
+
+              <View style={styles.metaRow}>
+                <Ionicons
+                  name="time-outline"
+                  size={12}
+                  color={isOverdue ? colors.negative : colors.textMuted}
+                  style={{ marginTop: 1 }}
+                />
+                <Text style={[styles.time, isOverdue && styles.timeOverdue]}>
+                  {formatReminderDateTime(reminder.scheduledAt)}
+                  {isOverdue ? '  · Overdue' : ''}
+                </Text>
+
+                <View style={[styles.categoryPill, { borderColor: accentColor + '50' }]}>
+                  <Text style={[styles.categoryLabel, { color: accentColor }]}>
+                    {reminder.category}
+                  </Text>
+                </View>
+              </View>
             </View>
 
-            {/* Right action */}
+            {/* Complete button */}
             <TouchableOpacity
               onPress={handleComplete}
-              style={styles.rightAction}
+              style={styles.checkBtn}
               hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
             >
               {isCompleted ? (
-                <Ionicons
-                  name="checkmark-circle"
-                  size={22}
-                  color={colors.positive}
-                />
+                <Ionicons name="checkmark-circle" size={24} color={colors.positive} />
               ) : isDismissed ? (
-                <Ionicons
-                  name="remove-circle-outline"
-                  size={22}
-                  color={colors.textMuted}
-                />
+                <Ionicons name="remove-circle-outline" size={24} color={colors.textMuted} />
               ) : (
-                <Ionicons
-                  name="ellipse-outline"
-                  size={22}
-                  color={colors.textMuted}
-                />
+                <View style={styles.checkCircle} />
               )}
             </TouchableOpacity>
           </TouchableOpacity>
@@ -217,28 +215,34 @@ const styles = StyleSheet.create({
     padding: spacing.md,
   },
   card: {
+    flexDirection: 'row',
     backgroundColor: colors.surface,
     borderRadius: radius.lg,
     borderWidth: 1,
     borderColor: colors.border,
+    overflow: 'hidden',
+  },
+  cardOverdue: {
+    backgroundColor: '#1E1410',
+    borderColor: colors.negative + '40',
+  },
+  accentBar: {
+    width: 3,
+    borderRadius: 0,
+    flexShrink: 0,
   },
   cardInner: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    padding: spacing.md,
+    paddingVertical: spacing.md,
+    paddingLeft: spacing.md,
+    paddingRight: spacing.sm,
     gap: spacing.sm,
-  },
-  categoryDot: {
-    width: 10,
-    height: 10,
-    borderRadius: radius.full,
-    flexShrink: 0,
-    marginTop: 2,
-    alignSelf: 'flex-start',
   },
   content: {
     flex: 1,
-    gap: 3,
+    gap: 4,
   },
   title: {
     ...typography.h3,
@@ -252,11 +256,42 @@ const styles = StyleSheet.create({
     ...typography.caption,
     color: colors.textSecondary,
   },
-  time: {
-    ...typography.caption,
+  metaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
     marginTop: 2,
   },
-  rightAction: {
+  time: {
+    ...typography.caption,
+    fontSize: 12,
+    color: colors.textMuted,
+    flex: 1,
+  },
+  timeOverdue: {
+    color: colors.negative,
+    fontWeight: '600',
+  },
+  categoryPill: {
+    borderWidth: 1,
+    borderRadius: radius.full,
+    paddingHorizontal: 6,
+    paddingVertical: 1,
+  },
+  categoryLabel: {
+    fontSize: 10,
+    fontWeight: '600',
+    letterSpacing: 0.3,
+  },
+  checkBtn: {
     flexShrink: 0,
+    padding: spacing.xs,
+  },
+  checkCircle: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    borderWidth: 2,
+    borderColor: colors.border,
   },
 })
