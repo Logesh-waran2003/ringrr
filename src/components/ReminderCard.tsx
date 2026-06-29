@@ -128,9 +128,6 @@ export function ReminderCard({
 
       <GestureDetector gesture={pan}>
         <Animated.View style={[styles.card, isOverdue && styles.cardOverdue, cardStyle]}>
-          {/* Left accent bar */}
-          <View style={[styles.accentBar, { backgroundColor: isOverdue ? colors.negative : accentColor }]} />
-
           <TouchableOpacity
             activeOpacity={0.75}
             onPress={handleTap}
@@ -225,11 +222,6 @@ const styles = StyleSheet.create({
   cardOverdue: {
     backgroundColor: '#1E1410',
     borderColor: colors.negative + '40',
-  },
-  accentBar: {
-    width: 3,
-    borderRadius: 0,
-    flexShrink: 0,
   },
   cardInner: {
     flex: 1,
