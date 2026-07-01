@@ -1,16 +1,16 @@
 export const colors = {
-  bg: '#0F0D0A',
-  surface: '#1A1714',
-  surfaceElevated: '#252119',
-  border: '#2C271F',
-  primary: '#F59E0B',
-  primaryLight: '#FCD34D',
-  primarySubtle: 'rgba(245,158,11,0.12)',
-  positive: '#10B981',
-  negative: '#F97316',
-  textPrimary: '#FAF7F2',
-  textSecondary: '#A8998A',
-  textMuted: '#5C5145',
+  bg:               '#0D0E16',
+  surface:          '#161820',
+  surfaceElevated:  '#1C1E2A',
+  border:           '#2A2B3A',
+  primary:          '#00C9C8',
+  primaryLight:     '#4EDDDC',
+  primarySubtle:    'rgba(0,201,200,0.12)',
+  positive:         '#10B981',
+  negative:         '#F97316',
+  textPrimary:      '#FFFFFF',
+  textSecondary:    '#C4C4D4',
+  textMuted:        '#5A5B6E',
 }
 
 export const typography = {
@@ -22,11 +22,11 @@ export const typography = {
   label: {
     fontSize: 12,
     fontWeight: '600' as const,
-    color: colors.textSecondary,
+    color: colors.textMuted,
     letterSpacing: 0.5,
     textTransform: 'uppercase' as const,
   },
 }
 
 export const spacing = { xs: 4, sm: 8, md: 16, lg: 24, xl: 32, xxl: 48 }
-export const radius = { sm: 8, md: 12, lg: 16, xl: 24, full: 999 }
+export const radius  = { sm: 8, md: 12, lg: 16, xl: 24, full: 999 }
