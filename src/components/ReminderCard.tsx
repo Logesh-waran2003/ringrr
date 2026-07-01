@@ -54,7 +54,7 @@ export function ReminderCard({
   const isOverdue   = reminder.status === 'pending' &&
     new Date(reminder.scheduledAt).getTime() <= Date.now()
 
-  const accentColor = CATEGORY_COLORS[reminder.category]
+  const accentColor = isOverdue ? colors.negative : CATEGORY_COLORS[reminder.category]
 
   const confirmDelete = useCallback(() => {
     Alert.alert('Delete Reminder', `Delete "${reminder.title}"?`, [
@@ -127,19 +127,33 @@ export function ReminderCard({
       </Animated.View>
 
       <GestureDetector gesture={pan}>
-        <Animated.View style={[styles.card, isOverdue && styles.cardOverdue, cardStyle]}>
+        <Animated.View style={[styles.card, isDone && styles.cardDone, cardStyle]}>
+          {/* Category / overdue accent bar */}
+          <View style={[styles.accentBar, { backgroundColor: accentColor }]} />
+
           <TouchableOpacity
             activeOpacity={0.75}
             onPress={handleTap}
             style={styles.cardInner}
           >
-            {/* Content */}
+            {/* Main content */}
             <View style={styles.content}>
+              {/* Time pill — always dark, no color bleed */}
+              <View style={[styles.timePill, isOverdue && styles.timePillOverdue]}>
+                <Ionicons
+                  name="time-outline"
+                  size={10}
+                  color={isOverdue ? colors.negative : colors.textMuted}
+                  style={{ marginTop: 1 }}
+                />
+                <Text style={[styles.timePillText, isOverdue && styles.timePillTextOverdue]}>
+                  {formatReminderDateTime(reminder.scheduledAt)}
+                  {isOverdue ? ' · Overdue' : ''}
+                </Text>
+              </View>
+
               <Text
-                style={[
-                  styles.title,
-                  isDone && styles.titleDone,
-                ]}
+                style={[styles.title, isDone && styles.titleDone]}
                 numberOfLines={2}
               >
                 {reminder.title}
@@ -150,25 +164,6 @@ export function ReminderCard({
                   {reminder.description}
                 </Text>
               ) : null}
-
-              <View style={styles.metaRow}>
-                <Ionicons
-                  name="time-outline"
-                  size={12}
-                  color={isOverdue ? colors.negative : colors.textMuted}
-                  style={{ marginTop: 1 }}
-                />
-                <Text style={[styles.time, isOverdue && styles.timeOverdue]}>
-                  {formatReminderDateTime(reminder.scheduledAt)}
-                  {isOverdue ? '  · Overdue' : ''}
-                </Text>
-
-                <View style={[styles.categoryPill, { borderColor: accentColor + '50' }]}>
-                  <Text style={[styles.categoryLabel, { color: accentColor }]}>
-                    {reminder.category}
-                  </Text>
-                </View>
-              </View>
             </View>
 
             {/* Complete button */}
@@ -182,7 +177,7 @@ export function ReminderCard({
               ) : isDismissed ? (
                 <Ionicons name="remove-circle-outline" size={24} color={colors.textMuted} />
               ) : (
-                <View style={styles.checkCircle} />
+                <View style={[styles.checkCircle, { borderColor: accentColor + '60' }]} />
               )}
             </TouchableOpacity>
           </TouchableOpacity>
@@ -219,9 +214,11 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     overflow: 'hidden',
   },
-  cardOverdue: {
-    backgroundColor: '#1E1410',
-    borderColor: colors.negative + '40',
+  cardDone: {
+    opacity: 0.55,
+  },
+  accentBar: {
+    width: 3,
   },
   cardInner: {
     flex: 1,
@@ -234,46 +231,45 @@ const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
-    gap: 4,
+    gap: 5,
+  },
+  timePill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    gap: 3,
+    backgroundColor: colors.border,
+    borderRadius: radius.full,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+  },
+  timePillOverdue: {
+    backgroundColor: colors.negative + '18',
+  },
+  timePillText: {
+    fontSize: 11,
+    fontWeight: '500',
+    color: colors.textMuted,
+    letterSpacing: 0.1,
+  },
+  timePillTextOverdue: {
+    color: colors.negative,
+    fontWeight: '600',
   },
   title: {
-    ...typography.h3,
-    lineHeight: 22,
+    fontSize: 15,
+    fontWeight: '600',
+    color: colors.textPrimary,
+    lineHeight: 21,
   },
   titleDone: {
     color: colors.textMuted,
     textDecorationLine: 'line-through',
   },
   description: {
-    ...typography.caption,
+    fontSize: 13,
     color: colors.textSecondary,
-  },
-  metaRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    marginTop: 2,
-  },
-  time: {
-    ...typography.caption,
-    fontSize: 12,
-    color: colors.textMuted,
-    flex: 1,
-  },
-  timeOverdue: {
-    color: colors.negative,
-    fontWeight: '600',
-  },
-  categoryPill: {
-    borderWidth: 1,
-    borderRadius: radius.full,
-    paddingHorizontal: 6,
-    paddingVertical: 1,
-  },
-  categoryLabel: {
-    fontSize: 10,
-    fontWeight: '600',
-    letterSpacing: 0.3,
+    lineHeight: 18,
   },
   checkBtn: {
     flexShrink: 0,
@@ -284,6 +280,5 @@ const styles = StyleSheet.create({
     height: 22,
     borderRadius: 11,
     borderWidth: 2,
-    borderColor: colors.border,
   },
 })

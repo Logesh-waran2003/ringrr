@@ -5,8 +5,8 @@ import type { Reminder, BuiltinSound } from '@/types/reminder'
 // NOTE: setNotificationHandler is called in useNotificationHandler (root layout hook).
 // Do not duplicate it here.
 
-const ANDROID_CHANNEL_ID = 'nudge-reminders'
-const ANDROID_EARLY_CHANNEL_ID = 'nudge-early'
+const ANDROID_CHANNEL_ID = 'nudge-alarms-v2'
+const ANDROID_EARLY_CHANNEL_ID = 'nudge-early-v2'
 
 /** Sound filename map — these must exist in assets/sounds/ at build time */
 const BUILTIN_SOUND_MAP: Record<BuiltinSound, string | undefined> = {

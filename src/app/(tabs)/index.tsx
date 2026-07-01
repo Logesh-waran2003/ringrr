@@ -55,7 +55,7 @@ async function fireTestAlarm() {
     trigger: {
       type: Notifications.SchedulableTriggerInputTypes.DATE,
       date: new Date(Date.now() + 5000),
-      channelId: 'nudge-reminders',
+      channelId: 'nudge-alarms-v2',
     } as Notifications.DateTriggerInput,
   })
 }
