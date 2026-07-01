@@ -29,7 +29,7 @@ export default function RootLayout() {
         }}
       >
         <Stack.Screen name="index" />
-        <Stack.Screen name="reminders" />
+        <Stack.Screen name="(tabs)" />
         <Stack.Screen
           name="create"
           options={{
@@ -43,13 +43,6 @@ export default function RootLayout() {
           options={{
             presentation: 'modal',
             animation: 'slide_from_bottom',
-            contentStyle: { backgroundColor: colors.bg },
-          }}
-        />
-        <Stack.Screen
-          name="history"
-          options={{
-            animation: 'slide_from_right',
             contentStyle: { backgroundColor: colors.bg },
           }}
         />
