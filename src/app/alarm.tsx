@@ -116,6 +116,7 @@ export default function AlarmScreen() {
         trigger: {
           type: Notifications.SchedulableTriggerInputTypes.DATE,
           date: snoozeDate,
+          channelId: 'nudge-reminders', // must match the alarm channel for sound+vibration
         } as Notifications.DateTriggerInput,
       })
     } catch (e) {

@@ -2,16 +2,8 @@ import * as Notifications from 'expo-notifications'
 import { Platform } from 'react-native'
 import type { Reminder, BuiltinSound } from '@/types/reminder'
 
-// Foreground notification behavior
-Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldShowAlert: true,
-    shouldPlaySound: true,
-    shouldSetBadge: true,
-    shouldShowBanner: true,
-    shouldShowList: true,
-  }),
-})
+// NOTE: setNotificationHandler is called in useNotificationHandler (root layout hook).
+// Do not duplicate it here.
 
 const ANDROID_CHANNEL_ID = 'nudge-reminders'
 const ANDROID_EARLY_CHANNEL_ID = 'nudge-early'
@@ -27,29 +19,41 @@ const BUILTIN_SOUND_MAP: Record<BuiltinSound, string | undefined> = {
 
 /**
  * Set up Android notification channels. Call once on app launch.
+ *
+ * Android caches channel settings after first creation — importance, sound, and
+ * vibration cannot be changed on an existing channel. We delete both channels
+ * first so that updated settings (MAX importance, default sound, vibration) are
+ * always applied cleanly.
  */
 export async function setupNotificationChannels(): Promise<void> {
   if (Platform.OS !== 'android') return
+
+  // Delete existing channels so updated settings take effect.
+  // deleteNotificationChannelAsync is a no-op when the channel doesn't exist.
+  await Notifications.deleteNotificationChannelAsync(ANDROID_CHANNEL_ID)
+  await Notifications.deleteNotificationChannelAsync(ANDROID_EARLY_CHANNEL_ID)
 
   // Alarm channel — bypasses DND, max importance, turns screen on
   await Notifications.setNotificationChannelAsync(ANDROID_CHANNEL_ID, {
     name: 'Alarms',
     description: 'Scheduled alarms — bypasses Do Not Disturb',
     importance: Notifications.AndroidImportance.MAX,
-    sound: undefined,
+    sound: 'default',           // explicitly use system default sound
     vibrationPattern: [0, 500, 200, 500],
     lightColor: '#00C9C8',
     bypassDnd: true,
     lockscreenVisibility: Notifications.AndroidNotificationVisibility.PUBLIC,
     showBadge: true,
+    enableVibrate: true,
   })
 
-  // Early alert channel — normal importance
+  // Early alert channel — high importance so it makes sound
   await Notifications.setNotificationChannelAsync(ANDROID_EARLY_CHANNEL_ID, {
     name: 'Early Alerts',
     description: '5-minute advance reminders',
-    importance: Notifications.AndroidImportance.DEFAULT,
-    sound: undefined,
+    importance: Notifications.AndroidImportance.HIGH,
+    sound: 'default',
+    enableVibrate: true,
   })
 }
 
