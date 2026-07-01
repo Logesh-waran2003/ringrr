@@ -62,6 +62,22 @@ export default function AlarmScreen() {
     }
     ;(async () => {
       try {
+        // Test mode — show a mock reminder without hitting storage
+        if (id === '__test__') {
+          setReminder({
+            id: '__test__',
+            title: 'Test Alarm',
+            description: 'This is how your alarm looks and sounds',
+            scheduledAt: new Date().toISOString(),
+            category: 'Personal',
+            status: 'pending',
+            sound: { type: 'builtin', name: 'default' },
+            notificationId: null,
+            earlyNotificationId: null,
+          } as any)
+          setLoading(false)
+          return
+        }
         const all = await loadReminders()
         const found = all.find((r) => r.id === id) ?? null
         if (!found) {
