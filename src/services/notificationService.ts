@@ -30,14 +30,21 @@ const BUILTIN_SOUND_MAP: Record<BuiltinSound, string | undefined> = {
  */
 export async function setupNotificationChannels(): Promise<void> {
   if (Platform.OS !== 'android') return
+
+  // Alarm channel — bypasses DND, max importance, turns screen on
   await Notifications.setNotificationChannelAsync(ANDROID_CHANNEL_ID, {
-    name: 'Reminders',
-    description: 'Your scheduled reminders',
-    importance: Notifications.AndroidImportance.HIGH,
+    name: 'Alarms',
+    description: 'Scheduled alarms — bypasses Do Not Disturb',
+    importance: Notifications.AndroidImportance.MAX,
     sound: undefined,
-    vibrationPattern: [0, 250, 250, 250],
-    lightColor: '#F59E0B',
+    vibrationPattern: [0, 500, 200, 500],
+    lightColor: '#00C9C8',
+    bypassDnd: true,
+    lockscreenVisibility: Notifications.AndroidNotificationVisibility.PUBLIC,
+    showBadge: true,
   })
+
+  // Early alert channel — normal importance
   await Notifications.setNotificationChannelAsync(ANDROID_EARLY_CHANNEL_ID, {
     name: 'Early Alerts',
     description: '5-minute advance reminders',
@@ -76,13 +83,17 @@ export async function scheduleReminderNotifications(
       ? BUILTIN_SOUND_MAP[reminder.sound.name]
       : undefined // custom sounds only play in-app
 
-  // Main notification
+  // Main notification — full screen intent fires alarm screen over lock screen
   const notificationId = await Notifications.scheduleNotificationAsync({
     content: {
       title: reminder.title,
       body: reminder.description ?? 'Time for your reminder',
       sound: soundFile ?? true,
       data: { reminderId: reminder.id },
+      sticky: true,
+      ...(Platform.OS === 'android' && {
+        priority: 'max',
+      }),
     },
     trigger: {
       type: Notifications.SchedulableTriggerInputTypes.DATE,
