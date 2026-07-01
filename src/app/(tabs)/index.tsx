@@ -10,10 +10,11 @@ import { useRouter, useFocusEffect } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated'
 import { Ionicons } from '@expo/vector-icons'
+import * as Notifications from 'expo-notifications'
 import { useReminders } from '@/hooks/useReminders'
 import { EmptyState } from '@/components/EmptyState'
-import { colors, spacing, typography, radius } from '@/constants/theme'
-import { getGreeting, formatReminderDateTime } from '@/utils/date'
+import { colors, spacing, radius } from '@/constants/theme'
+import { getGreeting } from '@/utils/date'
 import type { Reminder, Category } from '@/types/reminder'
 
 // ── Category accent colours ──────────────────────────────────────────────────
@@ -38,6 +39,25 @@ function formatHeaderDate(): string {
   const weekday = now.toLocaleDateString('en-US', { weekday: 'long' })
   const date    = now.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
   return `${weekday}, ${date}`
+}
+
+// ── Test Alarm helper ─────────────────────────────────────────────────────────
+async function fireTestAlarm() {
+  // Schedule notification 5s from now — tests DND bypass + sound
+  await Notifications.scheduleNotificationAsync({
+    content: {
+      title: '🔔 Test Alarm',
+      body: 'This is how your alarm sounds',
+      sound: true,
+      sticky: true,
+      data: { reminderId: '__test__' },
+    },
+    trigger: {
+      type: Notifications.SchedulableTriggerInputTypes.DATE,
+      date: new Date(Date.now() + 5000),
+      channelId: 'nudge-reminders',
+    } as Notifications.DateTriggerInput,
+  })
 }
 
 // ── Timeline Card ─────────────────────────────────────────────────────────────
@@ -156,9 +176,24 @@ export default function HomeScreen() {
 
           <Text style={styles.brandName}>Ringr</Text>
 
-          <TouchableOpacity style={styles.avatarBtn}>
-            <Ionicons name="person-circle" size={32} color={colors.textMuted} />
-          </TouchableOpacity>
+          <View style={styles.topBarRight}>
+            {/* Test alarm button */}
+            <TouchableOpacity
+              style={styles.testAlarmBtn}
+              onPress={async () => {
+                await fireTestAlarm()
+                router.push({ pathname: '/alarm', params: { id: '__test__' } })
+              }}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            >
+              <Ionicons name="notifications-outline" size={18} color={colors.primary} />
+              <Text style={styles.testAlarmLabel}>Test</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity style={styles.avatarBtn}>
+              <Ionicons name="person-circle" size={32} color={colors.textMuted} />
+            </TouchableOpacity>
+          </View>
         </Animated.View>
 
         {/* ── Dashboard header ──────────────────────────────────── */}
@@ -268,6 +303,26 @@ const styles = StyleSheet.create({
     height: 36,
     alignItems:     'center',
     justifyContent: 'center',
+  },
+  topBarRight: {
+    flexDirection: 'row',
+    alignItems:    'center',
+    gap:           spacing.sm,
+  },
+  testAlarmBtn: {
+    flexDirection:  'row',
+    alignItems:     'center',
+    gap:            4,
+    backgroundColor: colors.primarySubtle,
+    borderRadius:   radius.full,
+    paddingHorizontal: 10,
+    paddingVertical:   5,
+  },
+  testAlarmLabel: {
+    fontSize:   11,
+    fontWeight: '600',
+    color:      colors.primary,
+    letterSpacing: 0.3,
   },
 
   // Dashboard header
