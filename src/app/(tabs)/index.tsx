@@ -82,14 +82,8 @@ function TimelineCard({ reminder, index, onComplete, onEdit }: TimelineCardProps
             </Text>
           )}
 
-          {/* Footer: category + action */}
+          {/* Footer: complete button only */}
           <View style={styles.cardFooter}>
-            <View style={[styles.categoryChip, { borderColor: accent + '55', backgroundColor: accent + '18' }]}>
-              <Text style={[styles.categoryChipText, { color: accent }]}>
-                {reminder.category}
-              </Text>
-            </View>
-
             <TouchableOpacity
               style={styles.completeBtn}
               onPress={() => onComplete(reminder.id)}
@@ -422,19 +416,19 @@ const styles = StyleSheet.create({
     gap:     6,
   },
   timePill: {
-    alignSelf:       'flex-start',
-    backgroundColor: colors.primarySubtle,
-    borderRadius:    radius.full,
+    alignSelf:         'flex-start',
+    backgroundColor:   colors.border,
+    borderRadius:      radius.full,
     paddingHorizontal: 10,
     paddingVertical:   3,
   },
   timePillOverdue: {
-    backgroundColor: 'rgba(249,115,22,0.15)',
+    backgroundColor: 'rgba(249,115,22,0.2)',
   },
   timePillText: {
-    fontSize:   11,
-    fontWeight: '600',
-    color:      colors.primary,
+    fontSize:      11,
+    fontWeight:    '600',
+    color:         colors.textSecondary,
     letterSpacing: 0.2,
   },
   timePillTextOverdue: {
