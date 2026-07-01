@@ -37,8 +37,22 @@ const SOUNDS: { name: BuiltinSound; label: string }[] = [
   { name: 'gentle',  label: 'Gentle' },
 ]
 
-function formatDate(d: Date): string {
-  return d.toLocaleDateString('en-US', { weekday: 'short', day: 'numeric', month: 'short' })
+function padTwo(n: number): string {
+  return n.toString().padStart(2, '0')
+}
+function formatTimeDisplay(d: Date): { time: string; ampm: string } {
+  const h = d.getHours()
+  const m = d.getMinutes()
+  return {
+    time: `${padTwo(h)}:${padTwo(m)}`,
+    ampm: h >= 12 ? 'PM' : 'AM',
+  }
+}
+function formatDateDisplay(d: Date): { day: string; month: string } {
+  return {
+    day: d.getDate().toString(),
+    month: d.toLocaleDateString('en-US', { month: 'short' }).toUpperCase(),
+  }
 }
 function formatTime(d: Date): string {
   return d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })
@@ -60,17 +74,12 @@ export default function CreateScreen() {
   const [category, setCategory] = useState<Category>('Personal')
   const [sound, setSound] = useState<BuiltinSound>('default')
   const [saving, setSaving] = useState(false)
-  const [titleError, setTitleError] = useState('')
   const [conflicts, setConflicts] = useState<Reminder[]>([])
 
   useEffect(() => {
     if (!date) return
     setConflicts(detectConflicts(date.toISOString(), reminders))
   }, [date, reminders])
-
-  useEffect(() => {
-    if (title.trim().length > 0) setTitleError('')
-  }, [title])
 
   const handleDateChange = (_: any, selected?: Date) => {
     setShowDatePicker(false)
@@ -91,7 +100,10 @@ export default function CreateScreen() {
   }
 
   const doSave = useCallback(async () => {
-    if (!title.trim()) { setTitleError('Title is required'); return }
+    if (!title.trim()) {
+      Alert.alert('Missing Title', 'Please enter what needs to be done.')
+      return
+    }
     if (date.getTime() <= Date.now()) {
       Alert.alert('Past Time', 'Please choose a future date and time.')
       return
@@ -137,42 +149,54 @@ export default function CreateScreen() {
     }
   }, [conflicts, doSave])
 
+  const { time: timeDisplay, ampm } = formatTimeDisplay(date)
+  const { day: dayDisplay, month: monthDisplay } = formatDateDisplay(date)
+
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
       <KeyboardAvoidingView
         style={{ flex: 1 }}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       >
-        {/* Header */}
+        {/* ── Header ── */}
         <View style={styles.header}>
-          <TouchableOpacity onPress={() => router.back()} style={styles.closeBtn}>
-            <Ionicons name="close" size={20} color={colors.textSecondary} />
+          <TouchableOpacity onPress={() => router.back()} style={styles.backBtn} hitSlop={8}>
+            <Ionicons name="arrow-back" size={22} color={colors.textPrimary} />
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>New reminder</Text>
-          <View style={{ width: 36 }} />
+          <Text style={styles.headerTitle}>New Reminder</Text>
+          {/* Avatar placeholder — teal border circle */}
+          <View style={styles.avatarCircle} />
         </View>
 
         <ScrollView
           style={styles.scroll}
           contentContainerStyle={styles.form}
           keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
         >
-          {/* Conflict warning */}
+          {/* ── Conflict banner ── */}
           {conflicts.length > 0 && (
             <Animated.View entering={FadeInDown.duration(200)} style={styles.conflictBanner}>
-              <Ionicons name="warning-outline" size={15} color={colors.negative} />
+              <Ionicons name="warning" size={16} color="#F97316" />
               <Text style={styles.conflictText}>
                 Conflicts with{' '}
-                {conflicts.map((c) => `"${c.title}" (${formatTime(new Date(c.scheduledAt))})`).join(', ')}
+                {conflicts
+                  .map((c) => `"${c.title}" (${formatTime(new Date(c.scheduledAt))})`)
+                  .join(', ')}
               </Text>
             </Animated.View>
           )}
 
-          {/* Title */}
-          <Animated.View entering={FadeInDown.delay(60).springify()}>
+          {/* ── IDENTIFY label ── */}
+          <Animated.View entering={FadeInDown.delay(40).springify()}>
+            <Text style={styles.sectionLabel}>IDENTIFY</Text>
+          </Animated.View>
+
+          {/* ── Title input ── */}
+          <Animated.View entering={FadeInDown.delay(80).springify()}>
             <TextInput
-              style={[styles.titleInput, titleError ? styles.inputError : null]}
-              placeholder="What do you need to do?"
+              style={styles.titleInput}
+              placeholder="What needs to be done?"
               placeholderTextColor={colors.textMuted}
               value={title}
               onChangeText={setTitle}
@@ -180,60 +204,71 @@ export default function CreateScreen() {
               returnKeyType="next"
               maxLength={100}
             />
-            {titleError ? <Text style={styles.errorText}>{titleError}</Text> : null}
           </Animated.View>
 
-          {/* Date + Time inline */}
-          <Animated.View entering={FadeInDown.delay(120).springify()}>
-            <Text style={styles.fieldLabel}>When</Text>
-            <View style={styles.dateTimeRow}>
+          {/* ── Category dots ── */}
+          <Animated.View entering={FadeInDown.delay(120).springify()} style={styles.categoryRow}>
+            {CATEGORIES.map((cat) => (
               <TouchableOpacity
-                style={[styles.pickerBtn, { flex: 1 }]}
-                onPress={() => setShowDatePicker(true)}
+                key={cat}
+                style={styles.categoryDotWrap}
+                onPress={() => { setCategory(cat); Haptics.selectionAsync() }}
+                hitSlop={6}
               >
-                <Ionicons name="calendar-outline" size={16} color={colors.primary} />
-                <Text style={styles.pickerBtnText}>{formatDate(date)}</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.pickerBtn, styles.timeBtn]}
-                onPress={() => setShowTimePicker(true)}
-              >
-                <Ionicons name="time-outline" size={16} color={colors.primary} />
-                <Text style={styles.pickerBtnText}>{formatTime(date)}</Text>
-              </TouchableOpacity>
-            </View>
-          </Animated.View>
-
-          {/* Category */}
-          <Animated.View entering={FadeInDown.delay(180).springify()}>
-            <Text style={styles.fieldLabel}>Category</Text>
-            <View style={styles.categoryRow}>
-              {CATEGORIES.map((cat) => (
-                <TouchableOpacity
-                  key={cat}
+                <View
                   style={[
-                    styles.categoryPill,
-                    category === cat && {
-                      backgroundColor: CATEGORY_COLORS[cat] + '20',
-                      borderColor: CATEGORY_COLORS[cat],
-                    },
+                    styles.categoryDot,
+                    { backgroundColor: CATEGORY_COLORS[cat] },
+                    category !== cat && styles.categoryDotInactive,
                   ]}
-                  onPress={() => { setCategory(cat); Haptics.selectionAsync() }}
-                >
-                  <Text style={[
-                    styles.categoryPillText,
+                />
+                <Text
+                  style={[
+                    styles.categoryDotLabel,
                     category === cat && { color: CATEGORY_COLORS[cat] },
-                  ]}>
-                    {cat}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
+                  ]}
+                >
+                  {cat}
+                </Text>
+              </TouchableOpacity>
+            ))}
           </Animated.View>
 
-          {/* Sound */}
-          <Animated.View entering={FadeInDown.delay(240).springify()}>
-            <Text style={styles.fieldLabel}>Sound</Text>
+          {/* ── TIME / DATE cards ── */}
+          <Animated.View entering={FadeInDown.delay(160).springify()} style={styles.timeDateRow}>
+            {/* TIME card */}
+            <TouchableOpacity
+              style={styles.timeCard}
+              onPress={() => { setShowTimePicker(true); Haptics.selectionAsync() }}
+              activeOpacity={0.75}
+            >
+              <Text style={styles.cardLabel}>TIME</Text>
+              <Text style={styles.timeValue}>{timeDisplay}</Text>
+              <Text style={styles.cardSubLabel}>{ampm}</Text>
+            </TouchableOpacity>
+
+            {/* DATE card */}
+            <TouchableOpacity
+              style={styles.timeCard}
+              onPress={() => { setShowDatePicker(true); Haptics.selectionAsync() }}
+              activeOpacity={0.75}
+            >
+              <Text style={styles.cardLabel}>DATE</Text>
+              <Text style={styles.timeValue}>{dayDisplay}</Text>
+              <Text style={styles.cardSubLabel}>{monthDisplay}</Text>
+            </TouchableOpacity>
+          </Animated.View>
+
+          {/* ── ACOUSTIC AURA row ── */}
+          <Animated.View entering={FadeInDown.delay(200).springify()} style={styles.acousticRow}>
+            <Text style={styles.sectionLabel}>ACOUSTIC AURA</Text>
+            <TouchableOpacity onPress={() => Haptics.selectionAsync()}>
+              <Text style={styles.previewLink}>Preview Sound</Text>
+            </TouchableOpacity>
+          </Animated.View>
+
+          {/* ── Sound chips ── */}
+          <Animated.View entering={FadeInDown.delay(220).springify()}>
             <ScrollView
               horizontal
               showsHorizontalScrollIndicator={false}
@@ -242,15 +277,10 @@ export default function CreateScreen() {
               {SOUNDS.map((s) => (
                 <TouchableOpacity
                   key={s.name}
-                  style={[styles.soundPill, sound === s.name && styles.soundPillActive]}
+                  style={[styles.soundChip, sound === s.name && styles.soundChipActive]}
                   onPress={() => { setSound(s.name); Haptics.selectionAsync() }}
                 >
-                  <Ionicons
-                    name="musical-note-outline"
-                    size={12}
-                    color={sound === s.name ? '#000' : colors.textSecondary}
-                  />
-                  <Text style={[styles.soundPillText, sound === s.name && styles.soundPillTextActive]}>
+                  <Text style={[styles.soundChipText, sound === s.name && styles.soundChipTextActive]}>
                     {s.label}
                   </Text>
                 </TouchableOpacity>
@@ -258,9 +288,15 @@ export default function CreateScreen() {
             </ScrollView>
           </Animated.View>
 
-          {/* Note */}
+          {/* ── FREQUENCY ── */}
+          <Animated.View entering={FadeInDown.delay(260).springify()} style={styles.frequencyBlock}>
+            <Text style={styles.sectionLabel}>FREQUENCY</Text>
+            <Text style={styles.frequencyValue}>Once</Text>
+          </Animated.View>
+
+          {/* ── NOTE ── */}
           <Animated.View entering={FadeInDown.delay(300).springify()}>
-            <Text style={styles.fieldLabel}>Note <Text style={styles.optionalLabel}>(optional)</Text></Text>
+            <Text style={styles.sectionLabel}>NOTE</Text>
             <TextInput
               style={styles.noteInput}
               placeholder="Add a note..."
@@ -275,17 +311,23 @@ export default function CreateScreen() {
           </Animated.View>
         </ScrollView>
 
-        {/* Save button */}
-        <Animated.View entering={FadeInDown.delay(360).springify()} style={styles.saveWrap}>
+        {/* ── CTA button ── */}
+        <Animated.View entering={FadeInDown.delay(360).springify()} style={styles.ctaWrap}>
           <TouchableOpacity
-            style={[styles.saveBtn, saving && styles.saveBtnDisabled]}
+            style={[styles.ctaBtn, saving && styles.ctaBtnDisabled]}
             onPress={handleSave}
             disabled={saving}
+            activeOpacity={0.85}
           >
-            <Text style={styles.saveBtnText}>
-              {saving ? 'Saving...' : 'Set reminder'}
-            </Text>
+            <Text style={styles.ctaBtnText}>{saving ? 'Saving…' : 'Set Reminder'}</Text>
+            <View style={styles.ctaIcon}>
+              <Ionicons name="checkmark" size={18} color={colors.primary} />
+            </View>
           </TouchableOpacity>
+          <Text style={styles.priorityText}>
+            <Text style={{ color: colors.primary }}>•</Text>
+            {'  High Priority'}
+          </Text>
         </Animated.View>
       </KeyboardAvoidingView>
 
@@ -314,119 +356,225 @@ export default function CreateScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg },
+
+  // Header
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
+    paddingHorizontal: 20,
+    paddingVertical: 14,
   },
-  closeBtn: {
+  backBtn: {
     width: 36, height: 36,
-    borderRadius: radius.full,
-    backgroundColor: colors.surface,
     alignItems: 'center', justifyContent: 'center',
   },
-  headerTitle: { ...typography.h3, fontWeight: '500', color: colors.textSecondary },
+  headerTitle: {
+    fontSize: 17,
+    fontWeight: '700',
+    color: colors.textPrimary,
+    letterSpacing: 0.2,
+  },
+  avatarCircle: {
+    width: 36, height: 36,
+    borderRadius: 18,
+    borderWidth: 2,
+    borderColor: colors.primary,
+    backgroundColor: colors.surfaceElevated,
+  },
+
   scroll: { flex: 1 },
-  form: { padding: spacing.lg, gap: spacing.lg, paddingBottom: spacing.xxl },
+  form: { paddingHorizontal: 20, paddingBottom: 24, gap: 20 },
+
+  // Conflict banner
   conflictBanner: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    gap: spacing.xs,
-    backgroundColor: colors.negative + '15',
-    borderWidth: 1,
-    borderColor: colors.negative + '35',
-    borderRadius: radius.md,
-    padding: spacing.md,
+    gap: 8,
+    backgroundColor: '#3D1212',
+    borderRadius: 8,
+    padding: 12,
   },
-  conflictText: { ...typography.caption, color: colors.negative, flex: 1 },
+  conflictText: {
+    fontSize: 13,
+    color: colors.textPrimary,
+    flex: 1,
+    lineHeight: 18,
+  },
+
+  // Section labels
+  sectionLabel: {
+    fontSize: 10,
+    fontWeight: '600',
+    color: colors.textMuted,
+    letterSpacing: 1.2,
+    textTransform: 'uppercase',
+    marginBottom: 4,
+  },
+
+  // Title input
   titleInput: {
-    backgroundColor: colors.surface,
+    fontSize: 34,
+    fontWeight: '700',
+    color: colors.primary,
+    padding: 0,
+    margin: 0,
+    lineHeight: 42,
+  },
+
+  // Category dots
+  categoryRow: {
+    flexDirection: 'row',
+    gap: 16,
+    alignItems: 'center',
+  },
+  categoryDotWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  categoryDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+  },
+  categoryDotInactive: {
+    opacity: 0.35,
+  },
+  categoryDotLabel: {
+    fontSize: 13,
+    fontWeight: '500',
+    color: colors.textMuted,
+  },
+
+  // TIME / DATE cards
+  timeDateRow: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  timeCard: {
+    flex: 1,
+    backgroundColor: colors.surfaceElevated,
+    borderRadius: 12,
     borderWidth: 1,
     borderColor: colors.border,
-    borderRadius: radius.md,
-    padding: spacing.md,
-    ...typography.h2,
-    fontSize: 20,
-    color: colors.textPrimary,
+    padding: 16,
   },
-  inputError: { borderColor: colors.negative },
-  errorText: { ...typography.caption, color: colors.negative, marginTop: 4 },
-  fieldLabel: {
+  cardLabel: {
+    fontSize: 10,
+    fontWeight: '600',
+    color: colors.textMuted,
+    letterSpacing: 1.2,
+    textTransform: 'uppercase',
+    marginBottom: 6,
+  },
+  timeValue: {
+    fontSize: 42,
+    fontWeight: '700',
+    color: colors.textPrimary,
+    lineHeight: 50,
+    letterSpacing: -1,
+  },
+  cardSubLabel: {
+    fontSize: 13,
+    color: colors.textMuted,
+    marginTop: 2,
+    fontWeight: '500',
+  },
+
+  // Acoustic aura row
+  acousticRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  previewLink: {
+    fontSize: 12,
+    color: colors.primary,
+    fontWeight: '600',
+  },
+
+  // Sound chips
+  soundRow: { gap: 8, paddingBottom: 2 },
+  soundChip: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 999,
+    backgroundColor: colors.surfaceElevated,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  soundChipActive: {
+    borderColor: colors.primary,
+    borderWidth: 1.5,
+    backgroundColor: colors.surfaceElevated,
+  },
+  soundChipText: {
     fontSize: 13,
     fontWeight: '500',
     color: colors.textSecondary,
-    marginBottom: spacing.sm,
   },
-  optionalLabel: {
-    fontSize: 12,
-    fontWeight: '400',
-    color: colors.textMuted,
+  soundChipTextActive: {
+    color: colors.primary,
+    fontWeight: '600',
   },
-  dateTimeRow: {
-    flexDirection: 'row',
-    gap: spacing.sm,
+
+  // Frequency
+  frequencyBlock: { gap: 4 },
+  frequencyValue: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: colors.textPrimary,
   },
-  pickerBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.xs,
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radius.md,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm + 2,
-  },
-  timeBtn: {
-    flexShrink: 0,
-  },
-  pickerBtnText: { fontSize: 14, color: colors.textPrimary, fontWeight: '500' },
-  categoryRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
-  categoryPill: {
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.xs + 2,
-    borderRadius: radius.full,
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.surface,
-  },
-  categoryPillText: { fontSize: 13, fontWeight: '500', color: colors.textSecondary },
-  soundRow: { gap: spacing.sm, paddingRight: spacing.sm },
-  soundPill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.xs + 2,
-    borderRadius: radius.full,
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.surface,
-  },
-  soundPillActive: { backgroundColor: colors.primary, borderColor: colors.primary },
-  soundPillText: { fontSize: 13, fontWeight: '500', color: colors.textSecondary },
-  soundPillTextActive: { color: '#000' },
+
+  // Note input
   noteInput: {
-    backgroundColor: colors.surface,
+    backgroundColor: colors.surfaceElevated,
+    borderRadius: 12,
     borderWidth: 1,
     borderColor: colors.border,
-    borderRadius: radius.md,
-    padding: spacing.md,
-    ...typography.body,
+    padding: 14,
+    fontSize: 14,
     color: colors.textPrimary,
     minHeight: 88,
+    marginTop: 8,
   },
-  saveWrap: { padding: spacing.lg, paddingTop: 0 },
-  saveBtn: {
+
+  // CTA
+  ctaWrap: {
+    paddingHorizontal: 20,
+    paddingBottom: 8,
+    paddingTop: 12,
+    gap: 10,
+  },
+  ctaBtn: {
     backgroundColor: colors.primary,
-    borderRadius: radius.lg,
-    paddingVertical: spacing.md + 2,
+    borderRadius: 999,
+    height: 52,
+    flexDirection: 'row',
     alignItems: 'center',
+    paddingLeft: 24,
+    paddingRight: 8,
   },
-  saveBtnDisabled: { opacity: 0.5 },
-  saveBtnText: { fontSize: 16, fontWeight: '700', color: '#000' },
+  ctaBtnDisabled: { opacity: 0.55 },
+  ctaBtnText: {
+    flex: 1,
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#0D0E16',
+  },
+  ctaIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#FFFFFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  priorityText: {
+    fontSize: 12,
+    color: colors.textPrimary,
+    textAlign: 'center',
+    fontWeight: '500',
+  },
 })

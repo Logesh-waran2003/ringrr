@@ -28,7 +28,7 @@ export function useNotificationHandler() {
         | string
         | undefined
       if (reminderId) {
-        router.push({ pathname: '/edit', params: { id: reminderId } })
+        router.push({ pathname: '/alarm', params: { id: reminderId } })
       }
     })
 

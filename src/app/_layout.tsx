@@ -46,6 +46,14 @@ export default function RootLayout() {
             contentStyle: { backgroundColor: colors.bg },
           }}
         />
+        <Stack.Screen
+          name="alarm"
+          options={{
+            presentation: 'fullScreenModal',
+            animation: 'fade',
+            contentStyle: { backgroundColor: '#0D1E1E' },
+          }}
+        />
       </Stack>
     </GestureHandlerRootView>
   )

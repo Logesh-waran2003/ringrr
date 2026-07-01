@@ -3,21 +3,109 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  TouchableOpacity,
   View,
 } from 'react-native'
 import { useRouter, useFocusEffect } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated'
+import { Ionicons } from '@expo/vector-icons'
 import { useReminders } from '@/hooks/useReminders'
-import { ReminderCard } from '@/components/ReminderCard'
 import { EmptyState } from '@/components/EmptyState'
 import { colors, spacing, typography, radius } from '@/constants/theme'
-import { getGreeting } from '@/utils/date'
-import type { Reminder } from '@/types/reminder'
+import { getGreeting, formatReminderDateTime } from '@/utils/date'
+import type { Reminder, Category } from '@/types/reminder'
 
-type Group = { title: string; data: Reminder[]; accent?: string }
+// ── Category accent colours ──────────────────────────────────────────────────
+const CATEGORY_COLORS: Record<Category, string> = {
+  Personal: '#8B5CF6',
+  Work:     '#3B82F6',
+  Health:   colors.positive,
+  Social:   '#F59E0B',
+}
 
-export default function RemindersScreen() {
+// ── Helpers ──────────────────────────────────────────────────────────────────
+function formatTimePill(isoString: string): string {
+  return new Date(isoString).toLocaleTimeString('en-US', {
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true,
+  })
+}
+
+function formatHeaderDate(): string {
+  const now = new Date()
+  const weekday = now.toLocaleDateString('en-US', { weekday: 'long' })
+  const date    = now.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
+  return `${weekday}, ${date}`
+}
+
+// ── Timeline Card ─────────────────────────────────────────────────────────────
+interface TimelineCardProps {
+  reminder: Reminder
+  index:    number
+  onComplete: (id: string) => void
+  onEdit:     (id: string) => void
+}
+
+function TimelineCard({ reminder, index, onComplete, onEdit }: TimelineCardProps) {
+  const accent = CATEGORY_COLORS[reminder.category] ?? colors.primary
+  const isOverdue = new Date(reminder.scheduledAt).getTime() < Date.now() && reminder.status === 'pending'
+
+  return (
+    <Animated.View entering={FadeInDown.delay(index * 60).springify()}>
+      <TouchableOpacity
+        activeOpacity={0.75}
+        style={styles.timelineCard}
+        onPress={() => onEdit(reminder.id)}
+      >
+        {/* Left accent bar */}
+        <View style={[styles.cardAccentBar, { backgroundColor: isOverdue ? colors.negative : accent }]} />
+
+        <View style={styles.cardBody}>
+          {/* Time pill */}
+          <View style={[styles.timePill, isOverdue && styles.timePillOverdue]}>
+            <Text style={[styles.timePillText, isOverdue && styles.timePillTextOverdue]}>
+              {formatTimePill(reminder.scheduledAt)}
+            </Text>
+          </View>
+
+          {/* Title */}
+          <Text style={styles.cardTitle} numberOfLines={1}>
+            {reminder.title}
+          </Text>
+
+          {/* Description */}
+          {!!reminder.description && (
+            <Text style={styles.cardDesc} numberOfLines={2}>
+              {reminder.description}
+            </Text>
+          )}
+
+          {/* Footer: category + action */}
+          <View style={styles.cardFooter}>
+            <View style={[styles.categoryChip, { borderColor: accent + '55', backgroundColor: accent + '18' }]}>
+              <Text style={[styles.categoryChipText, { color: accent }]}>
+                {reminder.category}
+              </Text>
+            </View>
+
+            <TouchableOpacity
+              style={styles.completeBtn}
+              onPress={() => onComplete(reminder.id)}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            >
+              <Ionicons name="checkmark-circle-outline" size={20} color={colors.primary} />
+            </TouchableOpacity>
+          </View>
+        </View>
+      </TouchableOpacity>
+    </Animated.View>
+  )
+}
+
+// ── Screen ────────────────────────────────────────────────────────────────────
+export default function HomeScreen() {
   const router = useRouter()
   const {
     loading,
@@ -27,10 +115,9 @@ export default function RemindersScreen() {
     laterItems,
     pending,
     history,
-    upcoming24h,
+    refresh,
     markComplete,
     deleteReminder,
-    refresh,
   } = useReminders()
 
   useFocusEffect(
@@ -39,6 +126,7 @@ export default function RemindersScreen() {
     }, [refresh])
   )
 
+  // Completed today count
   const completedToday = useMemo(() => {
     const today = new Date().toDateString()
     return history.filter(
@@ -46,96 +134,99 @@ export default function RemindersScreen() {
     ).length
   }, [history])
 
-  const upNext = useMemo(() => {
-    const cutoff = Date.now() + 2 * 60 * 60 * 1000
-    return upcoming24h.find(
-      (r) => new Date(r.scheduledAt).getTime() <= cutoff
-    ) ?? null
-  }, [upcoming24h])
-
-  const groups = useMemo<Group[]>(() => {
-    const g: Group[] = []
-    if (overdue.length)       g.push({ title: 'Overdue',   data: overdue,       accent: colors.negative })
-    if (todayItems.length)    g.push({ title: 'Today',     data: todayItems,    accent: colors.primary })
-    if (tomorrowItems.length) g.push({ title: 'Tomorrow',  data: tomorrowItems })
-    if (laterItems.length)    g.push({ title: 'Upcoming',  data: laterItems })
-    return g
+  // Flat timeline: merge all groups, sort by scheduledAt
+  const timeline = useMemo<Reminder[]>(() => {
+    return [...overdue, ...todayItems, ...tomorrowItems, ...laterItems].sort(
+      (a, b) => new Date(a.scheduledAt).getTime() - new Date(b.scheduledAt).getTime()
+    )
   }, [overdue, todayItems, tomorrowItems, laterItems])
+
+  // Donut ring progress
+  const totalToday   = todayItems.length + completedToday
+  const completionPct = totalToday > 0 ? Math.round((completedToday / totalToday) * 100) : 0
 
   if (loading) return null
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
-      {/* Header */}
-      <Animated.View entering={FadeIn.duration(350)} style={styles.header}>
-        <Text style={styles.greeting}>{getGreeting()}</Text>
-
-        {/* Stats row */}
-        <View style={styles.statsRow}>
-          <View style={styles.stat}>
-            <Text style={styles.statNum}>{pending.length}</Text>
-            <Text style={styles.statLabel}>pending</Text>
-          </View>
-          <View style={styles.statDivider} />
-          <View style={styles.stat}>
-            <Text style={styles.statNum}>{completedToday}</Text>
-            <Text style={styles.statLabel}>done today</Text>
-          </View>
-          {upNext && (
-            <>
-              <View style={styles.statDivider} />
-              <View style={[styles.stat, { flex: 2 }]}>
-                <Text style={[styles.statLabel, { color: colors.primary }]} numberOfLines={1}>
-                  up next
-                </Text>
-                <Text style={[styles.statNum, { fontSize: 13, color: colors.primary }]} numberOfLines={1}>
-                  {upNext.title}
-                </Text>
-              </View>
-            </>
-          )}
-        </View>
-      </Animated.View>
-
-      {/* List */}
       <ScrollView
         style={styles.scroll}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        {groups.length === 0 ? (
+        {/* ── Top Bar ──────────────────────────────────────────── */}
+        <Animated.View entering={FadeIn.duration(300)} style={styles.topBar}>
+          <TouchableOpacity style={styles.iconBtn} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+            <Ionicons name="menu" size={22} color={colors.textSecondary} />
+          </TouchableOpacity>
+
+          <Text style={styles.brandName}>Ringr</Text>
+
+          <TouchableOpacity style={styles.avatarBtn}>
+            <Ionicons name="person-circle" size={32} color={colors.textMuted} />
+          </TouchableOpacity>
+        </Animated.View>
+
+        {/* ── Dashboard header ──────────────────────────────────── */}
+        <Animated.View entering={FadeInDown.delay(60).springify()} style={styles.dashHeader}>
+          <Text style={styles.dashLabel}>DASHBOARD OVERVIEW</Text>
+          <Text style={styles.greeting}>{getGreeting()}</Text>
+          <Text style={styles.dateText}>{formatHeaderDate()}</Text>
+        </Animated.View>
+
+        {/* ── Progress + Stats row ──────────────────────────────── */}
+        <Animated.View entering={FadeInDown.delay(120).springify()} style={styles.progressRow}>
+          {/* Donut ring */}
+          <View style={styles.donutWrap}>
+            <View style={styles.donutRing}>
+              <Text style={styles.donutPct}>{completionPct}%</Text>
+              <Text style={styles.donutCompleted}>Completed</Text>
+              <Text style={styles.donutGoal}>Daily Goal</Text>
+            </View>
+          </View>
+
+          {/* Stat tiles */}
+          <View style={styles.statTiles}>
+            {/* Upcoming */}
+            <View style={styles.statTile}>
+              <View style={styles.statTileIcon}>
+                <Ionicons name="time-outline" size={18} color={colors.primary} />
+              </View>
+              <Text style={styles.statTileLabel}>Upcoming</Text>
+              <Text style={styles.statTileNum}>{pending.length}</Text>
+            </View>
+
+            {/* Done Today */}
+            <View style={styles.statTile}>
+              <View style={styles.statTileIcon}>
+                <Ionicons name="checkmark-done-outline" size={18} color={colors.primary} />
+              </View>
+              <Text style={styles.statTileLabel}>Done Today</Text>
+              <Text style={styles.statTileNum}>{completedToday}</Text>
+            </View>
+          </View>
+        </Animated.View>
+
+        {/* ── Your Timeline ─────────────────────────────────────── */}
+        <Animated.View entering={FadeInDown.delay(180).springify()} style={styles.sectionHeader}>
+          <Text style={styles.sectionTitle}>Your Timeline</Text>
+          <TouchableOpacity hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+            <Text style={styles.viewAllText}>VIEW ALL</Text>
+          </TouchableOpacity>
+        </Animated.View>
+
+        {/* Timeline cards */}
+        {timeline.length === 0 ? (
           <EmptyState />
         ) : (
-          groups.map((group, gi) => (
-            <Animated.View
-              key={group.title}
-              entering={FadeInDown.delay(gi * 50).springify()}
-              style={styles.group}
-            >
-              <View style={styles.groupHeaderRow}>
-                {group.accent && (
-                  <View style={[styles.groupDot, { backgroundColor: group.accent }]} />
-                )}
-                <Text style={[
-                  styles.groupHeader,
-                  group.accent ? { color: group.accent } : null,
-                ]}>
-                  {group.title}
-                </Text>
-                <Text style={styles.groupCount}>{group.data.length}</Text>
-              </View>
-
-              {group.data.map((reminder, index) => (
-                <ReminderCard
-                  key={reminder.id}
-                  reminder={reminder}
-                  index={index}
-                  onComplete={markComplete}
-                  onDelete={deleteReminder}
-                  onEdit={(id) => router.push({ pathname: '/edit', params: { id } })}
-                />
-              ))}
-            </Animated.View>
+          timeline.map((reminder, index) => (
+            <TimelineCard
+              key={reminder.id}
+              reminder={reminder}
+              index={index}
+              onComplete={markComplete}
+              onEdit={(id) => router.push({ pathname: '/edit', params: { id } })}
+            />
           ))
         )}
       </ScrollView>
@@ -143,70 +234,242 @@ export default function RemindersScreen() {
   )
 }
 
+// ── Styles ────────────────────────────────────────────────────────────────────
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.bg },
-  header: {
-    paddingHorizontal: spacing.lg,
-    paddingTop: spacing.md,
-    paddingBottom: spacing.md,
-    gap: spacing.sm,
+  container: {
+    flex: 1,
+    backgroundColor: colors.bg,
   },
-  greeting: {
-    ...typography.h1,
-  },
-  statsRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.md,
-  },
-  stat: {
-    gap: 1,
-  },
-  statNum: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: colors.textPrimary,
-    lineHeight: 22,
-  },
-  statLabel: {
-    fontSize: 11,
-    fontWeight: '500',
-    color: colors.textMuted,
-    letterSpacing: 0.3,
-  },
-  statDivider: {
-    width: 1,
-    height: 24,
-    backgroundColor: colors.border,
-  },
-  scroll: { flex: 1 },
-  scrollContent: {
-    paddingHorizontal: spacing.lg,
-    paddingBottom: 32,
-    flexGrow: 1,
-  },
-  group: { marginBottom: spacing.lg },
-  groupHeaderRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-    marginBottom: spacing.sm,
-  },
-  groupDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-  },
-  groupHeader: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: colors.textMuted,
-    letterSpacing: 0.3,
+  scroll: {
     flex: 1,
   },
-  groupCount: {
-    fontSize: 11,
-    color: colors.textMuted,
+  scrollContent: {
+    paddingBottom: 100,
+    flexGrow: 1,
+  },
+
+  // Top bar
+  topBar: {
+    flexDirection:   'row',
+    alignItems:      'center',
+    justifyContent:  'space-between',
+    paddingHorizontal: spacing.lg,
+    paddingTop:      spacing.sm,
+    paddingBottom:   spacing.md,
+  },
+  iconBtn: {
+    width: 36,
+    height: 36,
+    alignItems:     'center',
+    justifyContent: 'center',
+  },
+  brandName: {
+    fontSize:    22,
+    fontWeight:  '700',
+    color:       colors.primary,
+    letterSpacing: -0.3,
+  },
+  avatarBtn: {
+    width: 36,
+    height: 36,
+    alignItems:     'center',
+    justifyContent: 'center',
+  },
+
+  // Dashboard header
+  dashHeader: {
+    paddingHorizontal: spacing.lg,
+    paddingBottom:     spacing.lg,
+    gap:               4,
+  },
+  dashLabel: {
+    fontSize:      10,
+    fontWeight:    '600',
+    color:         colors.textMuted,
+    letterSpacing: 1.5,
+    textTransform: 'uppercase',
+    marginBottom:  spacing.xs,
+  },
+  greeting: {
+    fontSize:      28,
+    fontWeight:    '700',
+    color:         colors.textPrimary,
+    letterSpacing: -0.5,
+    lineHeight:    34,
+  },
+  dateText: {
+    fontSize:   13,
+    fontWeight: '400',
+    color:      colors.textMuted,
+    marginTop:  2,
+  },
+
+  // Progress row
+  progressRow: {
+    flexDirection:     'row',
+    alignItems:        'center',
+    paddingHorizontal: spacing.lg,
+    gap:               spacing.md,
+    marginBottom:      spacing.lg,
+  },
+
+  // Donut
+  donutWrap: {
+    alignItems:     'center',
+    justifyContent: 'center',
+  },
+  donutRing: {
+    width:          120,
+    height:         120,
+    borderRadius:   60,
+    borderWidth:    10,
+    borderColor:    colors.primary,
+    alignItems:     'center',
+    justifyContent: 'center',
+    backgroundColor: colors.surfaceElevated,
+  },
+  donutPct: {
+    fontSize:   22,
+    fontWeight: '700',
+    color:      colors.textPrimary,
+    lineHeight: 26,
+  },
+  donutCompleted: {
+    fontSize:   10,
     fontWeight: '500',
+    color:      colors.textSecondary,
+    marginTop:  2,
+  },
+  donutGoal: {
+    fontSize:   9,
+    fontWeight: '400',
+    color:      colors.textMuted,
+  },
+
+  // Stat tiles
+  statTiles: {
+    flex: 1,
+    gap:  spacing.sm,
+  },
+  statTile: {
+    backgroundColor: colors.surfaceElevated,
+    borderRadius:    radius.md,
+    padding:         spacing.md,
+    flex:            1,
+    gap:             4,
+  },
+  statTileIcon: {
+    width:          32,
+    height:         32,
+    borderRadius:   radius.sm,
+    backgroundColor: colors.primarySubtle,
+    alignItems:     'center',
+    justifyContent: 'center',
+    marginBottom:   2,
+  },
+  statTileLabel: {
+    fontSize:   11,
+    fontWeight: '500',
+    color:      colors.textMuted,
+    letterSpacing: 0.3,
+  },
+  statTileNum: {
+    fontSize:   24,
+    fontWeight: '700',
+    color:      colors.textPrimary,
+    lineHeight: 28,
+  },
+
+  // Section header
+  sectionHeader: {
+    flexDirection:     'row',
+    alignItems:        'center',
+    justifyContent:    'space-between',
+    paddingHorizontal: spacing.lg,
+    marginBottom:      spacing.md,
+  },
+  sectionTitle: {
+    fontSize:   17,
+    fontWeight: '600',
+    color:      colors.textPrimary,
+  },
+  viewAllText: {
+    fontSize:      11,
+    fontWeight:    '600',
+    color:         colors.primary,
+    letterSpacing: 0.8,
+  },
+
+  // Timeline card
+  timelineCard: {
+    flexDirection:     'row',
+    marginHorizontal:  spacing.lg,
+    marginBottom:      spacing.sm,
+    borderRadius:      radius.md,
+    backgroundColor:   colors.surfaceElevated,
+    borderWidth:       1,
+    borderColor:       colors.border,
+    overflow:          'hidden',
+  },
+  cardAccentBar: {
+    width:           3,
+    borderTopLeftRadius:    radius.md,
+    borderBottomLeftRadius: radius.md,
+  },
+  cardBody: {
+    flex:    1,
+    padding: spacing.md,
+    gap:     6,
+  },
+  timePill: {
+    alignSelf:       'flex-start',
+    backgroundColor: colors.primarySubtle,
+    borderRadius:    radius.full,
+    paddingHorizontal: 10,
+    paddingVertical:   3,
+  },
+  timePillOverdue: {
+    backgroundColor: 'rgba(249,115,22,0.15)',
+  },
+  timePillText: {
+    fontSize:   11,
+    fontWeight: '600',
+    color:      colors.primary,
+    letterSpacing: 0.2,
+  },
+  timePillTextOverdue: {
+    color: colors.negative,
+  },
+  cardTitle: {
+    fontSize:   15,
+    fontWeight: '600',
+    color:      colors.textPrimary,
+    lineHeight: 20,
+  },
+  cardDesc: {
+    fontSize:   13,
+    fontWeight: '400',
+    color:      colors.textSecondary,
+    lineHeight: 18,
+  },
+  cardFooter: {
+    flexDirection:  'row',
+    alignItems:     'center',
+    justifyContent: 'space-between',
+    marginTop:       2,
+  },
+  categoryChip: {
+    borderWidth:       1,
+    borderRadius:      radius.full,
+    paddingHorizontal: 8,
+    paddingVertical:   2,
+  },
+  categoryChipText: {
+    fontSize:   10,
+    fontWeight: '600',
+    letterSpacing: 0.3,
+  },
+  completeBtn: {
+    padding: 2,
   },
 })
