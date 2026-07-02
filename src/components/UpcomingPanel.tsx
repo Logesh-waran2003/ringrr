@@ -1,16 +1,9 @@
 import React from 'react'
 import { ScrollView, StyleSheet, Text, View } from 'react-native'
 import Animated, { FadeInDown } from 'react-native-reanimated'
-import { colors, radius, spacing, typography } from '@/constants/theme'
+import { colors, radius, spacing, typography, CATEGORY_COLORS } from '@/constants/theme'
 import { formatReminderDateTime } from '@/utils/date'
 import type { Reminder, Category } from '@/types/reminder'
-
-const CATEGORY_COLORS: Record<Category, string> = {
-  Personal: '#8B5CF6',
-  Work: '#3B82F6',
-  Health: '#10B981',
-  Social: '#F59E0B',
-}
 
 interface UpcomingPanelProps {
   reminders: Reminder[]

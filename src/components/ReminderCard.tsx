@@ -17,16 +17,9 @@ import Animated, {
 import { Gesture, GestureDetector } from 'react-native-gesture-handler'
 import * as Haptics from 'expo-haptics'
 import { Ionicons } from '@expo/vector-icons'
-import { colors, radius, spacing, typography } from '@/constants/theme'
+import { colors, radius, spacing, typography, CATEGORY_COLORS } from '@/constants/theme'
 import type { Reminder, Category } from '@/types/reminder'
 import { formatReminderDateTime } from '@/utils/date'
-
-const CATEGORY_COLORS: Record<Category, string> = {
-  Personal: '#8B5CF6',
-  Work:     '#3B82F6',
-  Health:   '#10B981',
-  Social:   '#F59E0B',
-}
 
 const SWIPE_THRESHOLD = -80
 

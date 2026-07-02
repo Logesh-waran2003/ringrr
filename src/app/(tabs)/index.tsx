@@ -1,5 +1,6 @@
 import React, { useMemo } from 'react'
 import {
+  Alert,
   ScrollView,
   StyleSheet,
   Text,
@@ -10,20 +11,11 @@ import { useRouter, useFocusEffect } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated'
 import { Ionicons } from '@expo/vector-icons'
-import * as Notifications from 'expo-notifications'
 import { useReminders } from '@/hooks/useReminders'
 import { EmptyState } from '@/components/EmptyState'
-import { colors, spacing, radius } from '@/constants/theme'
+import { colors, spacing, radius, CATEGORY_COLORS } from '@/constants/theme'
 import { getGreeting } from '@/utils/date'
 import type { Reminder, Category } from '@/types/reminder'
-
-// ── Category accent colours ──────────────────────────────────────────────────
-const CATEGORY_COLORS: Record<Category, string> = {
-  Personal: '#8B5CF6',
-  Work:     '#3B82F6',
-  Health:   colors.positive,
-  Social:   '#F59E0B',
-}
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 function formatTimePill(isoString: string): string {
@@ -41,34 +33,18 @@ function formatHeaderDate(): string {
   return `${weekday}, ${date}`
 }
 
-// ── Test Alarm helper ─────────────────────────────────────────────────────────
-async function fireTestAlarm() {
-  // Schedule notification 5s from now — tests DND bypass + sound
-  await Notifications.scheduleNotificationAsync({
-    content: {
-      title: '🔔 Test Alarm',
-      body: 'This is how your alarm sounds',
-      sound: true,
-      sticky: true,
-      data: { reminderId: '__test__' },
-    },
-    trigger: {
-      type: Notifications.SchedulableTriggerInputTypes.DATE,
-      date: new Date(Date.now() + 5000),
-      channelId: 'nudge-alarms-v2',
-    } as Notifications.DateTriggerInput,
-  })
-}
+
 
 // ── Timeline Card ─────────────────────────────────────────────────────────────
 interface TimelineCardProps {
   reminder: Reminder
   index:    number
   onComplete: (id: string) => void
+  onDelete:   (id: string) => void
   onEdit:     (id: string) => void
 }
 
-function TimelineCard({ reminder, index, onComplete, onEdit }: TimelineCardProps) {
+function TimelineCard({ reminder, index, onComplete, onDelete, onEdit }: TimelineCardProps) {
   const accent = CATEGORY_COLORS[reminder.category] ?? colors.primary
   const isOverdue = new Date(reminder.scheduledAt).getTime() < Date.now() && reminder.status === 'pending'
 
@@ -102,8 +78,15 @@ function TimelineCard({ reminder, index, onComplete, onEdit }: TimelineCardProps
             </Text>
           )}
 
-          {/* Footer: complete button only */}
+          {/* Footer: complete + delete buttons */}
           <View style={styles.cardFooter}>
+            <TouchableOpacity
+              style={styles.completeBtn}
+              onPress={() => onDelete(reminder.id)}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            >
+              <Ionicons name="trash-outline" size={18} color={colors.textMuted} />
+            </TouchableOpacity>
             <TouchableOpacity
               style={styles.completeBtn}
               onPress={() => onComplete(reminder.id)}
@@ -170,30 +153,11 @@ export default function HomeScreen() {
       >
         {/* ── Top Bar ──────────────────────────────────────────── */}
         <Animated.View entering={FadeIn.duration(300)} style={styles.topBar}>
-          <TouchableOpacity style={styles.iconBtn} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-            <Ionicons name="menu" size={22} color={colors.textSecondary} />
-          </TouchableOpacity>
+          <View style={styles.iconBtn} />
 
           <Text style={styles.brandName}>Ringr</Text>
 
-          <View style={styles.topBarRight}>
-            {/* Test alarm button */}
-            <TouchableOpacity
-              style={styles.testAlarmBtn}
-              onPress={async () => {
-                await fireTestAlarm()
-                router.push({ pathname: '/alarm', params: { id: '__test__' } })
-              }}
-              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-            >
-              <Ionicons name="notifications-outline" size={18} color={colors.primary} />
-              <Text style={styles.testAlarmLabel}>Test</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity style={styles.avatarBtn}>
-              <Ionicons name="person-circle" size={32} color={colors.textMuted} />
-            </TouchableOpacity>
-          </View>
+          <View style={styles.iconBtn} />
         </Animated.View>
 
         {/* ── Dashboard header ──────────────────────────────────── */}
@@ -207,7 +171,11 @@ export default function HomeScreen() {
         <Animated.View entering={FadeInDown.delay(120).springify()} style={styles.progressRow}>
           {/* Donut ring */}
           <View style={styles.donutWrap}>
-            <View style={styles.donutRing}>
+            <View style={[
+              styles.donutRing,
+              { borderColor: completionPct > 0 ? colors.primary : colors.border },
+              completionPct > 0 && completionPct < 100 && { borderTopColor: colors.border, borderRightColor: completionPct < 50 ? colors.border : colors.primary },
+            ]}>
               <Text style={styles.donutPct}>{completionPct}%</Text>
               <Text style={styles.donutCompleted}>Completed</Text>
               <Text style={styles.donutGoal}>Daily Goal</Text>
@@ -239,7 +207,10 @@ export default function HomeScreen() {
         {/* ── Your Timeline ─────────────────────────────────────── */}
         <Animated.View entering={FadeInDown.delay(180).springify()} style={styles.sectionHeader}>
           <Text style={styles.sectionTitle}>Your Timeline</Text>
-          <TouchableOpacity hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+          <TouchableOpacity
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            onPress={() => router.push('/reminders')}
+          >
             <Text style={styles.viewAllText}>VIEW ALL</Text>
           </TouchableOpacity>
         </Animated.View>
@@ -254,6 +225,12 @@ export default function HomeScreen() {
               reminder={reminder}
               index={index}
               onComplete={markComplete}
+              onDelete={(id) => {
+                Alert.alert('Delete Reminder', 'Delete this reminder?', [
+                  { text: 'Cancel', style: 'cancel' },
+                  { text: 'Delete', style: 'destructive', onPress: () => deleteReminder(id) },
+                ])
+              }}
               onEdit={(id) => router.push({ pathname: '/edit', params: { id } })}
             />
           ))
@@ -297,32 +274,6 @@ const styles = StyleSheet.create({
     fontWeight:  '700',
     color:       colors.primary,
     letterSpacing: -0.3,
-  },
-  avatarBtn: {
-    width: 36,
-    height: 36,
-    alignItems:     'center',
-    justifyContent: 'center',
-  },
-  topBarRight: {
-    flexDirection: 'row',
-    alignItems:    'center',
-    gap:           spacing.sm,
-  },
-  testAlarmBtn: {
-    flexDirection:  'row',
-    alignItems:     'center',
-    gap:            4,
-    backgroundColor: colors.primarySubtle,
-    borderRadius:   radius.full,
-    paddingHorizontal: 10,
-    paddingVertical:   5,
-  },
-  testAlarmLabel: {
-    fontSize:   11,
-    fontWeight: '600',
-    color:      colors.primary,
-    letterSpacing: 0.3,
   },
 
   // Dashboard header
@@ -372,7 +323,7 @@ const styles = StyleSheet.create({
     height:         120,
     borderRadius:   60,
     borderWidth:    10,
-    borderColor:    colors.primary,
+    borderColor:    colors.border,
     alignItems:     'center',
     justifyContent: 'center',
     backgroundColor: colors.surfaceElevated,

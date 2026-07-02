@@ -18,13 +18,10 @@ import { Ionicons } from '@expo/vector-icons'
 import DateTimePickerModal from '@react-native-community/datetimepicker'
 import { useReminders } from '@/hooks/useReminders'
 import { detectConflicts } from '@/services/conflictDetection'
-import { colors, radius, spacing, typography } from '@/constants/theme'
+import { colors, radius, spacing, typography, CATEGORY_COLORS } from '@/constants/theme'
 import type { Category, Reminder, BuiltinSound, SoundOption } from '@/types/reminder'
 
 const CATEGORIES: Category[] = ['Personal', 'Work', 'Health', 'Social']
-const CATEGORY_COLORS: Record<Category, string> = {
-  Personal: '#8B5CF6', Work: '#3B82F6', Health: '#10B981', Social: '#F59E0B',
-}
 const SOUNDS: { name: BuiltinSound; label: string }[] = [
   { name: 'default', label: 'Default' },
   { name: 'chime',   label: 'Chime' },
@@ -359,7 +356,7 @@ const styles = StyleSheet.create({
     ...typography.body, color: colors.textPrimary, minHeight: 88,
   },
   saveWrap: { padding: spacing.lg, paddingTop: 0 },
-  saveBtn: { backgroundColor: colors.primary, borderRadius: radius.lg, paddingVertical: spacing.md + 2, alignItems: 'center' },
+  saveBtn: { backgroundColor: colors.primary, borderRadius: radius.full, height: 52, alignItems: 'center', justifyContent: 'center' },
   saveBtnDisabled: { opacity: 0.5 },
   saveBtnText: { fontSize: 16, fontWeight: '700', color: '#000' },
 })

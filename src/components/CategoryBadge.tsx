@@ -1,14 +1,7 @@
 import React from 'react'
 import { StyleSheet, Text, View } from 'react-native'
-import { colors, radius, spacing, typography } from '@/constants/theme'
+import { colors, radius, spacing, typography, CATEGORY_COLORS } from '@/constants/theme'
 import type { Category } from '@/types/reminder'
-
-const CATEGORY_COLORS: Record<Category, string> = {
-  Personal: '#8B5CF6',
-  Work: '#3B82F6',
-  Health: '#10B981',
-  Social: '#F59E0B',
-}
 
 interface CategoryBadgeProps {
   category: Category

@@ -48,7 +48,7 @@ function formatCurrentTime(): string {
 export default function AlarmScreen() {
   const { id } = useLocalSearchParams<{ id: string }>()
   const router = useRouter()
-  const { markDismissed } = useReminders()
+  const { markDismissed, updateReminder } = useReminders()
 
   const [reminder, setReminder] = useState<Reminder | null>(null)
   const [currentTime, setCurrentTime] = useState(formatCurrentTime())
@@ -81,6 +81,7 @@ export default function AlarmScreen() {
         const all = await loadReminders()
         const found = all.find((r) => r.id === id) ?? null
         if (!found) {
+          console.warn('[AlarmScreen] Reminder not found (may have been deleted):', id)
           router.back()
           return
         }
@@ -106,21 +107,35 @@ export default function AlarmScreen() {
     if (!reminder) return
     try {
       const snoozeDate = new Date(Date.now() + 5 * 60 * 1000)
-      await Notifications.scheduleNotificationAsync({
-        content: {
-          title: reminder.title,
-          body: reminder.description ?? 'Snoozed reminder',
-          sound: true,
-          data: { reminderId: reminder.id },
-        },
-        trigger: {
-          type: Notifications.SchedulableTriggerInputTypes.DATE,
-          date: snoozeDate,
-          channelId: 'nudge-reminders', // must match the alarm channel for sound+vibration
-        } as Notifications.DateTriggerInput,
+      // Update the reminder's scheduledAt in storage — the hook's updateReminder
+      // will cancel old notifications and reschedule with the correct alarm channel
+      await updateReminder({
+        ...reminder,
+        scheduledAt: snoozeDate.toISOString(),
+        status: 'pending',
       })
     } catch (e) {
-      console.warn('[AlarmScreen] Snooze schedule failed:', e)
+      // Fallback: schedule notification directly if hook update fails
+      // (e.g. reminder was deleted while alarm screen was open)
+      console.warn('[AlarmScreen] Snooze via hook failed, scheduling directly:', e)
+      try {
+        const snoozeDate = new Date(Date.now() + 5 * 60 * 1000)
+        await Notifications.scheduleNotificationAsync({
+          content: {
+            title: reminder.title,
+            body: reminder.description ?? 'Snoozed reminder',
+            sound: true,
+            data: { reminderId: reminder.id },
+          },
+          trigger: {
+            type: Notifications.SchedulableTriggerInputTypes.DATE,
+            date: snoozeDate,
+            channelId: 'nudge-alarm-default',
+          } as Notifications.DateTriggerInput,
+        })
+      } catch (fallbackErr) {
+        console.warn('[AlarmScreen] Snooze fallback also failed:', fallbackErr)
+      }
     }
     router.back()
   }

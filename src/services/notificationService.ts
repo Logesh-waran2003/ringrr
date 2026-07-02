@@ -5,47 +5,77 @@ import type { Reminder, BuiltinSound } from '@/types/reminder'
 // NOTE: setNotificationHandler is called in useNotificationHandler (root layout hook).
 // Do not duplicate it here.
 
-const ANDROID_CHANNEL_ID = 'nudge-alarms-v2'
+/**
+ * Channel architecture (Android 8+):
+ * On Android, notification sound is a property of the CHANNEL, not individual
+ * notifications. To support multiple alarm sounds, we create one channel per
+ * sound. Each channel has the sound baked in at creation time.
+ *
+ * Channel IDs:
+ *   - nudge-alarm-default  → system default sound
+ *   - nudge-alarm-chime    → chime.wav
+ *   - nudge-alarm-bell     → bell.wav
+ *   - nudge-alarm-digital  → digital.wav
+ *   - nudge-alarm-gentle   → gentle.wav
+ *   - nudge-early-v2       → early alert (system default, HIGH importance)
+ */
+
+const CHANNEL_PREFIX = 'nudge-alarm-'
 const ANDROID_EARLY_CHANNEL_ID = 'nudge-early-v2'
 
-/** Sound filename map — these must exist in assets/sounds/ at build time */
-const BUILTIN_SOUND_MAP: Record<BuiltinSound, string | undefined> = {
-  default: undefined, // system default
+/** Sound filename map — these must exist in assets/sounds/ and be listed in app.json plugin config */
+const BUILTIN_SOUND_FILES: Record<BuiltinSound, string | null> = {
+  default: null,          // use system default
   chime: 'chime.wav',
   bell: 'bell.wav',
   digital: 'digital.wav',
   gentle: 'gentle.wav',
 }
 
+/** Get the Android channel ID for a given sound */
+function getChannelId(sound: BuiltinSound): string {
+  return `${CHANNEL_PREFIX}${sound}`
+}
+
 /**
  * Set up Android notification channels. Call once on app launch.
  *
- * Android caches channel settings after first creation — importance, sound, and
- * vibration cannot be changed on an existing channel. We delete both channels
- * first so that updated settings (MAX importance, default sound, vibration) are
- * always applied cleanly.
+ * Creates one channel per sound option (so Android uses the correct sound
+ * for each notification) plus one early-alert channel.
+ *
+ * Channels are deleted and recreated to ensure updated settings always apply
+ * (Android caches channel settings after first creation).
  */
 export async function setupNotificationChannels(): Promise<void> {
   if (Platform.OS !== 'android') return
 
-  // Delete existing channels so updated settings take effect.
-  // deleteNotificationChannelAsync is a no-op when the channel doesn't exist.
-  await Notifications.deleteNotificationChannelAsync(ANDROID_CHANNEL_ID)
+  const sounds: BuiltinSound[] = ['default', 'chime', 'bell', 'digital', 'gentle']
+
+  // Delete all existing alarm channels + early channel
+  for (const s of sounds) {
+    await Notifications.deleteNotificationChannelAsync(getChannelId(s))
+  }
   await Notifications.deleteNotificationChannelAsync(ANDROID_EARLY_CHANNEL_ID)
 
-  // Alarm channel — bypasses DND, max importance, turns screen on
-  await Notifications.setNotificationChannelAsync(ANDROID_CHANNEL_ID, {
-    name: 'Alarms',
-    description: 'Scheduled alarms — bypasses Do Not Disturb',
-    importance: Notifications.AndroidImportance.MAX,
-    sound: 'default',           // explicitly use system default sound
-    vibrationPattern: [0, 500, 200, 500],
-    lightColor: '#00C9C8',
-    bypassDnd: true,
-    lockscreenVisibility: Notifications.AndroidNotificationVisibility.PUBLIC,
-    showBadge: true,
-    enableVibrate: true,
-  })
+  // Create one alarm channel per sound
+  for (const s of sounds) {
+    const soundFile = BUILTIN_SOUND_FILES[s]
+    const channelId = getChannelId(s)
+    const label = s === 'default' ? 'Default' : s.charAt(0).toUpperCase() + s.slice(1)
+
+    await Notifications.setNotificationChannelAsync(channelId, {
+      name: `Alarm — ${label}`,
+      description: `Alarms with ${label} sound — bypasses Do Not Disturb`,
+      importance: Notifications.AndroidImportance.MAX,
+      sound: soundFile ?? 'default',   // null → 'default' for system sound
+      vibrationPattern: [0, 500, 200, 500],
+      lightColor: '#00C9C8',
+      bypassDnd: true,
+      lockscreenVisibility: Notifications.AndroidNotificationVisibility.PUBLIC,
+      showBadge: true,
+      enableVibrate: true,
+    })
+  }
 
   // Early alert channel — high importance so it makes sound
   await Notifications.setNotificationChannelAsync(ANDROID_EARLY_CHANNEL_ID, {
@@ -82,17 +112,20 @@ export async function scheduleReminderNotifications(
     throw new Error('Cannot schedule a notification in the past')
   }
 
-  const soundFile =
-    reminder.sound.type === 'builtin'
-      ? BUILTIN_SOUND_MAP[reminder.sound.name]
-      : undefined // custom sounds only play in-app
+  // Determine sound settings
+  const soundName: BuiltinSound =
+    reminder.sound.type === 'builtin' ? reminder.sound.name : 'default'
+  const soundFile = BUILTIN_SOUND_FILES[soundName]
+  const channelId = getChannelId(soundName)
 
-  // Main notification — full screen intent fires alarm screen over lock screen
+  // Main notification — uses the per-sound channel for correct audio
   const notificationId = await Notifications.scheduleNotificationAsync({
     content: {
       title: reminder.title,
       body: reminder.description ?? 'Time for your reminder',
-      sound: soundFile ?? true,
+      // On iOS, sound file in content determines what plays.
+      // On Android <8, this also matters. On Android 8+, channel sound wins.
+      sound: soundFile ?? 'default',
       data: { reminderId: reminder.id },
       sticky: true,
       ...(Platform.OS === 'android' && {
@@ -102,7 +135,7 @@ export async function scheduleReminderNotifications(
     trigger: {
       type: Notifications.SchedulableTriggerInputTypes.DATE,
       date: scheduledAt,
-      channelId: ANDROID_CHANNEL_ID,
+      channelId,
     } as Notifications.DateTriggerInput,
   })
 
@@ -114,7 +147,7 @@ export async function scheduleReminderNotifications(
       content: {
         title: `Coming up: ${reminder.title}`,
         body: 'Starts in 5 minutes',
-        sound: true,
+        sound: 'default',
         data: { reminderId: reminder.id, early: true },
       },
       trigger: {

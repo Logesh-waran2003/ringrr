@@ -19,16 +19,10 @@ import DateTimePickerModal from '@react-native-community/datetimepicker'
 import { useReminders } from '@/hooks/useReminders'
 import { detectConflicts } from '@/services/conflictDetection'
 import { generateId } from '@/utils/date'
-import { colors, radius, spacing, typography } from '@/constants/theme'
+import { colors, radius, spacing, typography, CATEGORY_COLORS } from '@/constants/theme'
 import type { Category, Reminder, BuiltinSound, SoundOption } from '@/types/reminder'
 
 const CATEGORIES: Category[] = ['Personal', 'Work', 'Health', 'Social']
-const CATEGORY_COLORS: Record<Category, string> = {
-  Personal: '#8B5CF6',
-  Work:     '#3B82F6',
-  Health:   '#10B981',
-  Social:   '#F59E0B',
-}
 const SOUNDS: { name: BuiltinSound; label: string }[] = [
   { name: 'default', label: 'Default' },
   { name: 'chime',   label: 'Chime' },
@@ -262,7 +256,10 @@ export default function CreateScreen() {
           {/* ── ACOUSTIC AURA row ── */}
           <Animated.View entering={FadeInDown.delay(200).springify()} style={styles.acousticRow}>
             <Text style={styles.sectionLabel}>ACOUSTIC AURA</Text>
-            <TouchableOpacity onPress={() => Haptics.selectionAsync()}>
+            <TouchableOpacity onPress={() => {
+              Haptics.selectionAsync()
+              Alert.alert('Sound Preview', 'Sound previews play when notifications fire. Select a sound and test with a reminder.')
+            }}>
               <Text style={styles.previewLink}>Preview Sound</Text>
             </TouchableOpacity>
           </Animated.View>
@@ -324,10 +321,6 @@ export default function CreateScreen() {
               <Ionicons name="checkmark" size={18} color={colors.primary} />
             </View>
           </TouchableOpacity>
-          <Text style={styles.priorityText}>
-            <Text style={{ color: colors.primary }}>•</Text>
-            {'  High Priority'}
-          </Text>
         </Animated.View>
       </KeyboardAvoidingView>
 
@@ -570,11 +563,5 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  priorityText: {
-    fontSize: 12,
-    color: colors.textPrimary,
-    textAlign: 'center',
-    fontWeight: '500',
   },
 })

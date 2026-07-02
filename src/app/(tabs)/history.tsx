@@ -11,13 +11,9 @@ import { SafeAreaView } from 'react-native-safe-area-context'
 import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated'
 import { Ionicons } from '@expo/vector-icons'
 import { useReminders } from '@/hooks/useReminders'
-import { colors, radius, spacing, typography } from '@/constants/theme'
+import { colors, radius, spacing, typography, CATEGORY_COLORS } from '@/constants/theme'
 import { formatReminderDateTime } from '@/utils/date'
 import type { Category } from '@/types/reminder'
-
-const CATEGORY_COLORS: Record<Category, string> = {
-  Personal: '#8B5CF6', Work: '#3B82F6', Health: '#10B981', Social: '#F59E0B',
-}
 
 export default function HistoryScreen() {
   const { history, deleteReminder } = useReminders()
