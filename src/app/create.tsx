@@ -21,6 +21,7 @@ import { detectConflicts } from '@/services/conflictDetection'
 import { generateId } from '@/utils/date'
 import { colors, radius, spacing, typography, CATEGORY_COLORS } from '@/constants/theme'
 import type { Category, Reminder, BuiltinSound, SoundOption } from '@/types/reminder'
+import { pickCustomSound } from '@/services/soundStorage'
 
 const CATEGORIES: Category[] = ['Personal', 'Work', 'Health', 'Social']
 const SOUNDS: { name: BuiltinSound; label: string }[] = [
@@ -66,7 +67,7 @@ export default function CreateScreen() {
   const [showDatePicker, setShowDatePicker] = useState(false)
   const [showTimePicker, setShowTimePicker] = useState(false)
   const [category, setCategory] = useState<Category>('Personal')
-  const [sound, setSound] = useState<BuiltinSound>('default')
+  const [soundOption, setSoundOption] = useState<SoundOption>({ type: 'builtin', name: 'default' })
   const [saving, setSaving] = useState(false)
   const [conflicts, setConflicts] = useState<Reminder[]>([])
 
@@ -104,7 +105,6 @@ export default function CreateScreen() {
     }
     setSaving(true)
     try {
-      const soundOption: SoundOption = { type: 'builtin', name: sound }
       const reminder: Reminder = {
         id: generateId(),
         title: title.trim(),
@@ -123,7 +123,7 @@ export default function CreateScreen() {
     } finally {
       setSaving(false)
     }
-  }, [title, description, date, category, sound, addReminder])
+  }, [title, description, date, category, soundOption, addReminder])
 
   const handleSave = useCallback(() => {
     if (conflicts.length > 0) {
@@ -274,14 +274,45 @@ export default function CreateScreen() {
               {SOUNDS.map((s) => (
                 <TouchableOpacity
                   key={s.name}
-                  style={[styles.soundChip, sound === s.name && styles.soundChipActive]}
-                  onPress={() => { setSound(s.name); Haptics.selectionAsync() }}
+                  style={[
+                    styles.soundChip,
+                    soundOption.type === 'builtin' && soundOption.name === s.name && styles.soundChipActive,
+                  ]}
+                  onPress={() => { setSoundOption({ type: 'builtin', name: s.name }); Haptics.selectionAsync() }}
                 >
-                  <Text style={[styles.soundChipText, sound === s.name && styles.soundChipTextActive]}>
+                  <Text style={[
+                    styles.soundChipText,
+                    soundOption.type === 'builtin' && soundOption.name === s.name && styles.soundChipTextActive,
+                  ]}>
                     {s.label}
                   </Text>
                 </TouchableOpacity>
               ))}
+              {/* Custom Song chip */}
+              <TouchableOpacity
+                style={[styles.soundChip, soundOption.type === 'custom' && styles.soundChipActive]}
+                onPress={async () => {
+                  Haptics.selectionAsync()
+                  try {
+                    const picked = await pickCustomSound()
+                    if (picked) {
+                      setSoundOption({ type: 'custom', uri: picked.uri, fileName: picked.fileName, duration: 0 })
+                    }
+                  } catch (e: any) {
+                    Alert.alert('Cannot Use File', e?.message ?? 'Failed to pick audio file.')
+                  }
+                }}
+              >
+                <Ionicons
+                  name="musical-notes-outline"
+                  size={13}
+                  color={soundOption.type === 'custom' ? colors.primary : colors.textSecondary}
+                  style={{ marginRight: 4 }}
+                />
+                <Text style={[styles.soundChipText, soundOption.type === 'custom' && styles.soundChipTextActive]}>
+                  {soundOption.type === 'custom' ? soundOption.fileName : 'Custom Song'}
+                </Text>
+              </TouchableOpacity>
             </ScrollView>
           </Animated.View>
 

@@ -20,6 +20,7 @@ import { useReminders } from '@/hooks/useReminders'
 import { detectConflicts } from '@/services/conflictDetection'
 import { colors, radius, spacing, typography, CATEGORY_COLORS } from '@/constants/theme'
 import type { Category, Reminder, BuiltinSound, SoundOption } from '@/types/reminder'
+import { pickCustomSound } from '@/services/soundStorage'
 
 const CATEGORIES: Category[] = ['Personal', 'Work', 'Health', 'Social']
 const SOUNDS: { name: BuiltinSound; label: string }[] = [
@@ -53,7 +54,7 @@ export default function EditScreen() {
   const [showDatePicker, setShowDatePicker] = useState(false)
   const [showTimePicker, setShowTimePicker] = useState(false)
   const [category, setCategory] = useState<Category>('Personal')
-  const [sound, setSound] = useState<BuiltinSound>('default')
+  const [soundOption, setSoundOption] = useState<SoundOption>({ type: 'builtin', name: 'default' })
   const [saving, setSaving] = useState(false)
   const [titleError, setTitleError] = useState('')
   const [conflicts, setConflicts] = useState<Reminder[]>([])
@@ -66,7 +67,10 @@ export default function EditScreen() {
     setDescription(reminder.description ?? '')
     setDate(new Date(reminder.scheduledAt))
     setCategory(reminder.category)
-    setSound(reminder.sound.type === 'builtin' ? reminder.sound.name : 'default')
+    setSoundOption(reminder.sound.type === 'builtin'
+      ? { type: 'builtin', name: reminder.sound.name }
+      : reminder.sound
+    )
     setInitialized(true)
   }, [reminder, initialized])
 
@@ -111,7 +115,6 @@ export default function EditScreen() {
     }
     setSaving(true)
     try {
-      const soundOption: SoundOption = { type: 'builtin', name: sound }
       const updated: Reminder = {
         ...reminder,
         title: title.trim(),
@@ -128,7 +131,7 @@ export default function EditScreen() {
     } finally {
       setSaving(false)
     }
-  }, [reminder, title, description, date, category, sound, updateReminder])
+  }, [reminder, title, description, date, category, soundOption, updateReminder])
 
   const handleSave = useCallback(() => {
     if (conflicts.length > 0) {
@@ -243,13 +246,49 @@ export default function EditScreen() {
               {SOUNDS.map((s) => (
                 <TouchableOpacity
                   key={s.name}
-                  style={[styles.soundPill, sound === s.name && styles.soundPillActive]}
-                  onPress={() => { setSound(s.name); Haptics.selectionAsync() }}
+                  style={[
+                    styles.soundPill,
+                    soundOption.type === 'builtin' && soundOption.name === s.name && styles.soundPillActive,
+                  ]}
+                  onPress={() => { setSoundOption({ type: 'builtin', name: s.name }); Haptics.selectionAsync() }}
                 >
-                  <Ionicons name="musical-note-outline" size={12} color={sound === s.name ? '#000' : colors.textSecondary} />
-                  <Text style={[styles.soundPillText, sound === s.name && styles.soundPillTextActive]}>{s.label}</Text>
+                  <Ionicons
+                    name="musical-note-outline"
+                    size={12}
+                    color={soundOption.type === 'builtin' && soundOption.name === s.name ? '#000' : colors.textSecondary}
+                  />
+                  <Text style={[
+                    styles.soundPillText,
+                    soundOption.type === 'builtin' && soundOption.name === s.name && styles.soundPillTextActive,
+                  ]}>
+                    {s.label}
+                  </Text>
                 </TouchableOpacity>
               ))}
+              {/* Custom Song chip */}
+              <TouchableOpacity
+                style={[styles.soundPill, soundOption.type === 'custom' && styles.soundPillActive]}
+                onPress={async () => {
+                  Haptics.selectionAsync()
+                  try {
+                    const picked = await pickCustomSound()
+                    if (picked) {
+                      setSoundOption({ type: 'custom', uri: picked.uri, fileName: picked.fileName, duration: 0 })
+                    }
+                  } catch (e: any) {
+                    Alert.alert('Cannot Use File', e?.message ?? 'Failed to pick audio file.')
+                  }
+                }}
+              >
+                <Ionicons
+                  name="musical-notes-outline"
+                  size={12}
+                  color={soundOption.type === 'custom' ? '#000' : colors.textSecondary}
+                />
+                <Text style={[styles.soundPillText, soundOption.type === 'custom' && styles.soundPillTextActive]}>
+                  {soundOption.type === 'custom' ? soundOption.fileName : 'Custom Song'}
+                </Text>
+              </TouchableOpacity>
             </ScrollView>
           </Animated.View>
 

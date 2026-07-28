@@ -1,9 +1,10 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import * as Notifications from 'expo-notifications'
+import { Audio } from 'expo-av'
 
 import { useReminders } from '@/hooks/useReminders'
 import { loadReminders } from '@/services/storage'
@@ -53,8 +54,9 @@ export default function AlarmScreen() {
   const [reminder, setReminder] = useState<Reminder | null>(null)
   const [currentTime, setCurrentTime] = useState(formatCurrentTime())
   const [loading, setLoading] = useState(true)
+  const soundRef = useRef<Audio.Sound | null>(null)
 
-  // Load reminder from storage
+  // Load reminder from storage and start custom sound if needed
   useEffect(() => {
     if (!id) {
       router.back()
@@ -86,6 +88,24 @@ export default function AlarmScreen() {
           return
         }
         setReminder(found)
+
+        // Start custom sound playback if applicable
+        if (found.sound.type === 'custom') {
+          try {
+            await Audio.setAudioModeAsync({
+              playsInSilentModeIOS: true,
+              staysActiveInBackground: true,
+            })
+            const { sound: avSound } = await Audio.Sound.createAsync(
+              { uri: found.sound.uri },
+              { shouldPlay: true, isLooping: true, volume: 1.0 }
+            )
+            soundRef.current = avSound
+          } catch (audioErr) {
+            // File may have been deleted or is corrupt — fail gracefully
+            console.warn('[AlarmScreen] Custom sound playback failed:', audioErr)
+          }
+        }
       } catch (e) {
         console.error('[AlarmScreen] Failed to load reminder:', e)
         router.back()
@@ -93,6 +113,15 @@ export default function AlarmScreen() {
         setLoading(false)
       }
     })()
+
+    // Cleanup sound on unmount
+    return () => {
+      if (soundRef.current) {
+        soundRef.current.stopAsync().catch(() => {})
+        soundRef.current.unloadAsync().catch(() => {})
+        soundRef.current = null
+      }
+    }
   }, [id])
 
   // Tick the status-bar clock every 30 s
@@ -103,8 +132,19 @@ export default function AlarmScreen() {
     return () => clearInterval(interval)
   }, [])
 
+  const stopSound = async () => {
+    if (soundRef.current) {
+      try {
+        await soundRef.current.stopAsync()
+        await soundRef.current.unloadAsync()
+      } catch (_) {}
+      soundRef.current = null
+    }
+  }
+
   const handleSnooze = async () => {
     if (!reminder) return
+    await stopSound()
     try {
       const snoozeDate = new Date(Date.now() + 5 * 60 * 1000)
       // Update the reminder's scheduledAt in storage — the hook's updateReminder
@@ -142,6 +182,7 @@ export default function AlarmScreen() {
 
   const handleDismiss = async () => {
     if (!reminder) return
+    await stopSound()
     try {
       await markDismissed(reminder.id)
     } catch (e) {

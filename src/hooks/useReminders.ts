@@ -14,6 +14,7 @@ import {
   reRegisterAllNotifications,
   requestNotificationPermission,
 } from '@/services/notificationService'
+import { cleanupCustomSound } from '@/services/soundStorage'
 
 export function useReminders() {
   const [reminders, setReminders] = useState<Reminder[]>([])
@@ -119,6 +120,10 @@ export function useReminders() {
         if (reminder) await cancelReminderNotifications(reminder)
         const next = await storageDelete(id)
         setReminders(next)
+        // Clean up custom sound file if no remaining alarm still references it
+        if (reminder?.sound.type === 'custom') {
+          await cleanupCustomSound(reminder.sound.uri, next)
+        }
       } catch (e: any) {
         throw new Error(e?.message ?? 'Failed to delete reminder')
       }
