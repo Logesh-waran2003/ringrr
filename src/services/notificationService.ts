@@ -11,16 +11,21 @@ import type { Reminder, BuiltinSound } from '@/types/reminder'
  * notifications. To support multiple alarm sounds, we create one channel per
  * sound. Each channel has the sound baked in at creation time.
  *
- * Channel IDs:
- *   - nudge-alarm-default  → system default sound
- *   - nudge-alarm-chime    → chime.wav
- *   - nudge-alarm-bell     → bell.wav
- *   - nudge-alarm-digital  → digital.wav
- *   - nudge-alarm-gentle   → gentle.wav
- *   - nudge-early-v2       → early alert (system default, HIGH importance)
+ * Channel IDs (v2 — bumped to bust Android's cached stale channel config):
+ *   - nudge-alarms-v2-default  → system default sound
+ *   - nudge-alarms-v2-chime    → chime.wav
+ *   - nudge-alarms-v2-bell     → bell.wav
+ *   - nudge-alarms-v2-digital  → digital.wav
+ *   - nudge-alarms-v2-gentle   → gentle.wav
+ *   - nudge-early-v2           → early alert (system default, HIGH importance)
+ *
+ * Android caches channel settings (importance, bypassDnd, lockscreenVisibility)
+ * after first creation and ignores subsequent setNotificationChannelAsync calls
+ * on the same ID. Bumping the prefix forces Android to treat these as brand-new
+ * channels with the correct settings.
  */
 
-const CHANNEL_PREFIX = 'nudge-alarm-'
+const CHANNEL_PREFIX = 'nudge-alarms-v2-'
 const ANDROID_EARLY_CHANNEL_ID = 'nudge-early-v2'
 
 /** Sound filename map — these must exist in assets/sounds/ and be listed in app.json plugin config */
@@ -51,11 +56,17 @@ export async function setupNotificationChannels(): Promise<void> {
 
   const sounds: BuiltinSound[] = ['default', 'chime', 'bell', 'digital', 'gentle']
 
-  // Delete all existing alarm channels + early channel
+  // Delete new v2 channels (so updated settings always apply on reinstall/update)
   for (const s of sounds) {
     await Notifications.deleteNotificationChannelAsync(getChannelId(s))
   }
   await Notifications.deleteNotificationChannelAsync(ANDROID_EARLY_CHANNEL_ID)
+
+  // Also delete legacy v1 channels (nudge-alarm-*) to keep Android Settings tidy
+  const OLD_PREFIX = 'nudge-alarm-'
+  for (const s of sounds) {
+    await Notifications.deleteNotificationChannelAsync(`${OLD_PREFIX}${s}`)
+  }
 
   // Create one alarm channel per sound
   for (const s of sounds) {

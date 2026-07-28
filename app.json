@@ -22,7 +22,9 @@
         "android.permission.SCHEDULE_EXACT_ALARM",
         "android.permission.USE_EXACT_ALARM",
         "android.permission.VIBRATE",
-        "android.permission.POST_NOTIFICATIONS"
+        "android.permission.POST_NOTIFICATIONS",
+        "android.permission.USE_FULL_SCREEN_INTENT",
+        "android.permission.WAKE_LOCK"
       ]
     },
     "web": {
@@ -56,7 +58,8 @@
           "backgroundColor": "#0F0D0A"
         }
       ],
-      "@react-native-community/datetimepicker"
+      "@react-native-community/datetimepicker",
+      "./plugins/withAlarmLockScreen"
     ],
     "experiments": {
       "typedRoutes": true

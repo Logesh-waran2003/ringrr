@@ -130,7 +130,7 @@ export default function AlarmScreen() {
           trigger: {
             type: Notifications.SchedulableTriggerInputTypes.DATE,
             date: snoozeDate,
-            channelId: 'nudge-alarm-default',
+            channelId: 'nudge-alarms-v2-default',
           } as Notifications.DateTriggerInput,
         })
       } catch (fallbackErr) {
