@@ -137,7 +137,7 @@ export default function AlarmScreen() {
       try {
         await soundRef.current.stopAsync()
         await soundRef.current.unloadAsync()
-      } catch (_) {}
+      } catch {}
       soundRef.current = null
     }
   }

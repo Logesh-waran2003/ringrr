@@ -63,7 +63,7 @@ export async function pickCustomSound(): Promise<{ uri: string; fileName: string
 
   try {
     await FileSystem.copyAsync({ from: asset.uri, to: destUri })
-  } catch (e: any) {
+  } catch {
     throw new Error(
       'Failed to copy audio file. The file may be DRM-protected or corrupted.'
     )
